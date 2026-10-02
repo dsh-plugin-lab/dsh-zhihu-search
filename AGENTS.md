@@ -83,6 +83,18 @@
 
 知乎 API 自身的反直觉处归 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；**模块内的坑下放到对应子目录的 `AGENTS.md`**（在那里工作时自动注入），此处只留跨模块、踩了整条链就崩的几条。
 
+- **宿主版本可能与 devDeps 错位**：本仓 devDeps 锁在某个宿主编译，实际运行的宿主可能更新。
+  改代码前先跑 `dsh --version` 对比 `package.json` 的 devDeps；错位可能导致**编译通过但运行时崩**。
+  升级 devDeps 要同步决定 `engines.dsh` 的兼容范围。
+  - **连带一条：传递依赖也会被抬**。宿主线升级时，宿主包自己依赖的第三方包可能一并抬版；
+    本仓若把它写死在旧版，包管理器会装出**两份同名包**，类型互不兼容 ——
+    编译报「A 不能赋给 B」而两个路径都带 `node_modules`（姊妹仓 dsh-workbuddy-bridge 的
+    `@earendil-works/pi-ai` 就是这么被 `dsh-llm-pi-ai` 从 `^0.85` 抬到 `^0.87` 的）。
+  - **判据**：报错里出现两个不同层级的 `node_modules` → 不是类型定义变了，是同一个包装了两份。
+    **处置**：把本仓那份升到与宿主同源的范围（用 `^`，别写死）。
+  - **核验兼容性要在仓库外**：装目标线宿主包做类型比对时用临时目录 ——
+    在仓内建目录会被当作 workspace 成员，`pnpm add` 会顺带重排本仓的 `node_modules`。
+
 - **生效链取决于 profile 怎么挂的，先查再假设**：`Get-Item <profile>\node_modules\dsh-zhihu-search | Select LinkType,Target`。
   - **符号链接到仓库**：`npm run build`（含 `npm test` 的 build）**直接写线上**，`dsh-client-hmr` 轮询 `lib/client.js` 当场换掉**浏览器半体**；host 半体要重启才换。改客户端半体因此免发版即生效，但**构建即上线** —— 没验证过的构建会立刻影响正在用的界面。
   - **普通目录（registry 副本）**：build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>` → 重启。按版本安装会把链接换成副本，开发环也就断了。
