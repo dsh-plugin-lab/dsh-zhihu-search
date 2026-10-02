@@ -92,8 +92,11 @@
     `@earendil-works/pi-ai` 就是这么被 `dsh-llm-pi-ai` 从 `^0.85` 抬到 `^0.87` 的）。
   - **判据**：报错里出现两个不同层级的 `node_modules` → 不是类型定义变了，是同一个包装了两份。
     **处置**：把本仓那份升到与宿主同源的范围（用 `^`，别写死）。
-  - **核验兼容性要在仓库外**：装目标线宿主包做类型比对时用临时目录 ——
-    在仓内建目录会被当作 workspace 成员，`pnpm add` 会顺带重排本仓的 `node_modules`。
+  - **核验兼容性要在仓库外**：装目标线宿主包做类型比对时用临时目录。
+    在仓内建目录的代价是双份的：包管理器把它当 workspace 成员，`add` 会顺带重排本仓 `node_modules`，
+    并往锁文件写一条 **importer** 记录。目录删了记录还在，而**本机安装不带 frozen 校验会静默自愈**，
+    只有 CI 的 frozen 模式才判红（姊妹仓 2026-10-02 三平台齐红，失败在第一步 install）。
+    判据：在锁文件里搜那个目录名；处置：重新解析，别手工编辑锁文件。
 
 - **生效链取决于 profile 怎么挂的，先查再假设**：`Get-Item <profile>\node_modules\dsh-zhihu-search | Select LinkType,Target`。
   - **符号链接到仓库**：`npm run build`（含 `npm test` 的 build）**直接写线上**，`dsh-client-hmr` 轮询 `lib/client.js` 当场换掉**浏览器半体**；host 半体要重启才换。改客户端半体因此免发版即生效，但**构建即上线** —— 没验证过的构建会立刻影响正在用的界面。
