@@ -128,6 +128,10 @@ dsh plugin --profile web add "$PWD"
 
 `dsh plugin` installs the package into the profile and lists it in `dsh.profile.bundles`. Restart `dsh --profile web` to pick it up.
 
+⚠️ The `npm install` above is not optional: under the `link:` form the repository supplies its
+own dependencies (see [AGENTS.md](AGENTS.md)) — skip it and the plugin shows as "not running"
+(`ERR_MODULE_NOT_FOUND`).
+
 ### From npm
 
 ```bash

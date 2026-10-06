@@ -128,6 +128,9 @@ dsh plugin --profile web add "$PWD"
 
 `dsh plugin` 会把本包装进 profile 并挂进 `dsh.profile.bundles`。重启 `dsh --profile web` 后生效。
 
+⚠️ 上面那步 `npm install` 不能省：`link:` 装法下依赖由仓库自己提供（见 [AGENTS.md](AGENTS.md)），
+漏装则插件显示「未运行」（`ERR_MODULE_NOT_FOUND`）。
+
 ### 从 npm 安装
 
 ```bash
