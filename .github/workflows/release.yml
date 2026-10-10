@@ -62,9 +62,17 @@ jobs:
           echo "::error::发版只能从 main 触发，当前 ref 是 ${{ github.ref }}"
           exit 1
 
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # gh release create --generate-notes 需要完整历史
+          token: ${{ steps.app-token.outputs.token }}
 
       - uses: actions/setup-node@v7
         with:
@@ -139,13 +147,13 @@ jobs:
       # （没有改动就跳过 —— 版本驱动下这是常态，不该因此变红）。
       - name: Commit any remaining manifest changes
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "dsh-shipwright[bot]"
+          git config user.email "5262543+dsh-shipwright[bot]@users.noreply.github.com"
           if git diff --quiet -- package.json package-lock.json; then
             echo "清单没有改动（版本驱动：bump 已在本地提交里），跳过提交"
           else
             git add package.json package-lock.json
-            git commit -m "chore: commit manifest state for release ${{ steps.version.outputs.version }}"
+            git commit -m "chore: commit manifest state for release ${{ steps.version.outputs.version }} [skip ci]"
           fi
 
       # 端到端验收：真实接口 + 宿主 output.schema 校验，这条路径只有它能覆盖
