@@ -21,5 +21,3 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: release-drafter/release-drafter@v7
-        with:
-          disable-autolabeler: true
