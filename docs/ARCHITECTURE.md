@@ -221,7 +221,8 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 
 - **声明面只有一个**：`package.json` 的 `peerDependencies`。它同时是安装器的判据与 npm 页面上的对外承诺 —— 改它等于改对外契约，因此必须与实测对齐，不能凭文档推断。
 - **依赖的是运行时行为，不是 API 形状**：`schema.volatile()` 的活引用语义（`.get()`）、**只有 volatile 字段进配置页**、`settings.configure({ auto: false }, fiber)` 的页面策略、`ctx.on('loader/volatile-update', …)` 的就地对账、`role('secret')` 脱敏、**`ctx.inject` 的属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派（key = 包名，且**该槽不传 `form`**）、客户端服务 `ctx.configForms` 的 `get`/`getSnapshot`/`subscribe`/`mutate`、客户端模块格式。任一处改动都可能在升级后**静默失效**（卡片不显示、开关不生效、密钥读不到）。
-- **驱动版本用 dist-tag，不用版本号**：DSH 至今全是 prerelease。`latest` 在多数子包上指向过期版本（具体值现查 `npm view @deepseek-ai/dsh dist-tags`），**`alpha` 才是当前承诺线**（2026-09-22 起；在那之前是 `next`，而 `next` 现在已低于我们的下限）。三条线的语义与实测由 [compat.yml](../.github/workflows/compat.yml) 每周核对，处理链归 [docs/PUBLISHING.md](PUBLISHING.md) 的「兼容性」。
+- **驱动版本用 dist-tag，不用版本号**：DSH 至今全是 prerelease。`latest` 在多数子包上指向过期版本（具体值现查 `npm view @deepseek-ai/dsh dist-tags`），**`next` 才是当前承诺线**（2026-09-24 起；在那之前是 `alpha`，而 `alpha` 现在不在我们的声明区间里）。三条线的语义与实测由 [compat.yml](../.github/workflows/compat.yml) 每周核对，处理链归 [docs/PUBLISHING.md](PUBLISHING.md) 的「兼容性」。
+- **声明面是 `engines.dsh` 加全部 `@deepseek-ai/dsh-*`，逐字相同**：只改一半时，使用者按依赖段装出来的宿主可能不满足 `engines.dsh`（或反过来），而**接缝缺席是静默的**。由 [test/redlines.test.ts](../test/redlines.test.ts) 的「声明面自洽」一组断言钉住。
 - **类型面会先于行为面动**：宿主收紧 API 签名时 `npm run typecheck` 先红，而全部测试仍然全绿。判断「兼容不兼容」不能只看测试结果。
 
 ### 契约纪律（破坏即改契约）

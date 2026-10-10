@@ -14,7 +14,7 @@
 - 对外可见行为变化，同一次改动内同步 [README.md](README.md) 与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 改根 [README.md](README.md) 必同改 [README_en.md](README_en.md)，冲突以中文为准
 - 「版本兼容」章节只讲分水岭与真源指针，**不抄会漂的宿主版本**；判据：`engines.dsh` 一旦落后于实际部署的宿主线（[compat.yml](.github/workflows/compat.yml) 的 declaration 作业转红即为信号），该章与两份 README 的「前置」必须同批复核
-- **声明面应当自洽**：`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明（9 条 peer + 18 条 dev，去重后 18 个包）**同形状**、落在同一条区间上。两份声明矛盾时，使用者按我们给的区间装出来的宿主未必有本插件赖以工作的设置接缝，而接缝缺席是**静默**的（配置页不出现、宿主不报错）。**2026-09-22 起它成立了** —— 整条声明面跟到 alpha 线（此前停在 next 线，是已知的、有理由的例外；那条例外已作废）。由 [test/redlines.test.ts](test/redlines.test.ts) 的「声明面自洽」一组断言，理由是[决策记录](.agents/notes/2026-09-22-declaration-floor-moves-to-alpha.md)
+- **声明面应当自洽**：`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明（9 条 peer + 18 条 dev，去重后 18 个包）**逐字相同**（同形状、同区间）。两份声明矛盾时，使用者按我们给的区间装出来的宿主未必有本插件赖以工作的设置接缝，而接缝缺席是**静默**的（配置页不出现、宿主不报错）。由 [test/redlines.test.ts](test/redlines.test.ts) 的「声明面自洽」一组断言钉住。**2026-10-10 起判据是「逐字相同」**，此前只要求「下限不低于」—— 那比这段散文弱了两层：上界也是声明的一半，而换版脚本曾经漏掉 `engines.dsh`（它不在依赖段里、名字也不带 `dsh-` 尾巴）。理由是[决策记录](.agents/notes/2026-10-10-swap-must-move-engines-dsh.md)；下限落在哪条线上见[另一篇](.agents/notes/2026-10-10-declaration-floor-to-rc-line.md)
 - **依赖写在 peer 还是 dev，判据是「我们与它的关系」，不是它住在哪一侧** —— 两类，缺一类就会出事：
   - **只做类型面（module augmentation）、我们只 `import type`** → 只写 `devDependencies`。现有两个：
     客户端的 `@deepseek-ai/dsh-client-ui-plugin-manager`（运行时关系由 `dsh.client.inject` 表达，peer 是重复声明）、
@@ -51,7 +51,7 @@
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）· `npm run test:contract`（打真实接口，需 `ZHIHU_ACCESS_SECRET`，日常 CI 不跑）
 - 真机验收：`ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]` —— 默认验 profile 里装的那份，覆盖真实接口 + 宿主 schema 校验 + 渲染文本，见 [scripts/README.md](scripts/README.md)
 - **发版两步，顺序是死的**：① 本地 `npm version <档位> [--preid=alpha] --no-git-tag-version` → `git commit`；② `gh workflow run release.yml`（**没有 tier 参数** —— workflow 只发 `package.json` 里那个号，它不 bump）。档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定；**dist-tag 由版本自己那段推**（`2.0.0-alpha.1` → `alpha`，稳定档 → `latest`）；同一条 X.Y.Z 线上推下一个 alpha 要用 `prerelease`，不是 `premajor`（后者开新线，从 `2.0.0-alpha.0` 会得到不可覆盖的 `3.0.0-alpha.0`）；无行为变更时 [守卫](scripts/release-guard.mjs) 会拦下（`-f force=true` 才能越过）
-- 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap next` → `npm install --ignore-scripts` → `node scripts/compat-swap.mjs verify next`。**它会改写 `package.json`**，只在一次性 clone 里跑；声明面单独查用 `check next`（承诺线就是 next；`alpha` 已低于我们的下限，只作记录）
+- 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap next` —— 一条命令走完「改写整条声明面 → 清掉旧线的锁与树 → 裸 `npm install --ignore-scripts` → 核对实装版本」，`verify next` 可以单独再跑一次。[scripts/README.md](scripts/README.md) 有全部子命令
 
 ## 验证快照（定性结论出自 2026-09-16 实跑；2026-09-24 复核过 main 的 CI、tag `v2.0.0` 与 npm `latest`，结论未变）
 
@@ -61,7 +61,7 @@
 - 真机验收：[scripts/acceptance.mjs](scripts/acceptance.mjs) 覆盖扩池 / 输出对称 / www 归一化 + 宿主 schema 校验 + 渲染文本；升级 + host 重启后在 profile 安装副本上跑通，工具面同参数复验一致
 - 发版守卫：只有文档 / 工具脚本改动的区间在 `npm ci` 之前被拦下（后续步骤全 skipped，npm 侧零动作）；含 `src/` 的区间正常放行
 - 诚实渲染：到顶必说 / 来源构成分流 / 空态首句条件限定由 [test/presentation.test.ts](test/presentation.test.ts) 固化；`count` 回满上限不额外提示（刻意防噪音）
-- 宿主兼容性：由 [compat.yml](.github/workflows/compat.yml) 每周对 `next`（承诺线）与 `alpha`（**已低于声明下限，只记录**）换包，跑的是现有套件、不写新测试；结论与处理链归 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。这里只留定性结论：**类型面会先于行为面动**，所以「测试全绿」不能当作「兼容」的结论。**2026-09-22 更新**：此前那条「alpha 类型面已红」的记录随设置接缝迁移作废 —— 本机在 alpha 线上 build / typecheck / test 全绿（逐条退出码见[决策记录](.agents/notes/2026-09-22-declaration-floor-moves-to-alpha.md)）。**2026-09-24 再对调回 `next`**：宿主把新线（rc 档）发在 `next` 上、`alpha` 停在旧档 —— 具体值一律现查 `npm view @deepseek-ai/dsh dist-tags`；本仓声明面**不跟着抬**（区间本就罩得住 `next`），要靠区间判断就查 `package.json` 的 `engines.dsh`
+- 宿主兼容性：由 [compat.yml](.github/workflows/compat.yml) 每周对 `next`（承诺线）与 `alpha`（**已低于声明下限，只记录**）换包，跑的是现有套件、不写新测试；结论与处理链归 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。这里只留定性结论：**类型面会先于行为面动**，所以「测试全绿」不能当作「兼容」的结论。**2026-09-24 承诺线迁到 `next`；2026-10-10 下限跟着抬到 RC 线起点**（此前下界停在 alpha 线那一段上，在 npm 的预发布语义下**永远罩不住** `next` 上的版本 —— 元组对不上，正是 issue #2 的 `declaration` 那条红）。具体值一律现查 `npm view @deepseek-ai/dsh dist-tags`，区间形状查 [package.json](package.json) 的 `engines.dsh`；理由是[决策记录](.agents/notes/2026-10-10-declaration-floor-to-rc-line.md)
 - 明文迁徙：**真机跑通**（2026-09-16）—— 装入 1.6.2 + 重启 host 后，`settings.yaml` 的 `zhihu-search:` 段只剩 `disableNativeWebSearch`，值（40 位十六进制、与原明文逐字一致）落进 `.credentials.yaml` 的 `refs`，两个文件同一秒被改写。此前在 `lib/` 产物 + 真实 provider + 本机 `settings.yaml` **副本**上也跑通过（段内清理、其他 section 与注释原样保留、第二次运行是空操作）。
   **2026-09-22 起范围收窄**：设置文档那一层随这次接缝换代（2026-09-22）一起没了（宿主按 section 名导入且只映射三个官方 section，我们那段到不了插件），迁徙只剩**组合配置**一条来源，`purge` 通道退场。上面那条真机结论仍然真实，但它描述的是接缝换代之前的宿主
 
@@ -77,7 +77,7 @@
 - **文档校验脚本还没落进本仓**：AGENTS 的「能落成校验的不写散文」这条目前对文档是空的（链接与行尾没有执行体）。容器仓 `dsh-plugins/scripts/check-links.py` 是本机可用的实现，收进来时要顺带回答「CI 跑不跑它」（`ci.yml` 现在没有 docs 步骤）
 - **`prepare` 与 `dsh-ds-balance` 相反，本仓零解释**：本仓 `package.json` 声明 `"prepare": "npm run build"`，而 DSB 明文「本仓**不**声明 `prepare` —— 声明了 CI 的 `npm ci` 会先产出 `lib/`，`artifacts.test.ts` 那种『干净检出』判据就永远绿不到点上（那边踩过，见其决策记录）」。两仓同源，一个声明一个刻意不声明。**要么删掉本仓的 `prepare`，要么写清本仓为什么例外**（例如 profile 用 `link:` 挂载时依赖它保证产物新鲜）—— 属跨仓取舍，未裁
 
-- **承诺线已迁到 `next`（2026-09-24），本仓下限未动**：声明区间形状见 [package.json](package.json) 的 `engines.dsh`（区间本就罩得住 rc 线，`node scripts/check-declaration.mjs` rc=0），`compat.yml` 的两个 job 已改名为 `committed` / `record`。**下次发版时顺带核两件**：① `npm view @deepseek-ai/dsh dist-tags` 与 `committed` 指的那条线是否仍一致；② 本次（纯文档 + 不随包的脚本 + 两行注释）按 Q0 否**不发版**，改动搭下次车
+- **下限已抬到 RC 线起点（2026-10-10），下一轮的触发点与判据**：声明面见 [package.json](package.json) 的 `engines.dsh`。**宿主再往前推一个补丁位的预发布**（同一个 `major.minor.patch` 之外）时，同一条预发布语义会让这条下限再次罩不住 —— 届时 `node scripts/check-declaration.mjs` 先红，处理链按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」（抬下限属 Q2 口径，档位按问题链定，别照抄上次的 minor）
 
 ## 活跃坑（工具链与 DSH 平台）
 
@@ -122,7 +122,7 @@
   - **`entry id` 与包名不再同串**时卡片照常出现，但 `ctx.configForms.get(<entry id>)` 查不到命名空间 —— **永远只读且不报错**。
   三者都不报错。判据是「能不能拿到**这一条**的 `form`」，所以能力探测盯的是那条链上真正会断的两环（服务与槽），**不是槽名** —— 说谎的探测比没有探测更坏，见 [src/client/AGENTS.md](src/client/AGENTS.md)。
 - **换包有两个方向相反的假信号，都踩过**：
-  - **假红**：`npm install <包>@<tag>` 会把某个恰好没被点名的包**目录清空**（实测 `dsh-client-locale` 与 `dsh-client-ui-primitives` 都中过），随后 typecheck 报「找不到模块」。`--legacy-peer-deps` 也不是解药：它连 npm 的 peer 自动安装一起关掉，`dsh-tools` 自己的 peer 集体缺席。正路是 [scripts/compat-swap.mjs](scripts/compat-swap.mjs) 的「改写 package.json + 裸 `npm install`」。
+  - **假红**：`npm install <包>@<tag>` 会把某个恰好没被点名的包**目录清空**（实测 `dsh-client-locale` 与 `dsh-client-ui-primitives` 都中过），随后 typecheck 报「找不到模块」。`--legacy-peer-deps` 也不是解药：它连 npm 的 peer 自动安装一起关掉，`dsh-tools` 自己的 peer 集体缺席。`--force` 更坏 —— 它把真实的 peer 冲突一起吞掉。正路是 [scripts/compat-swap.mjs](scripts/compat-swap.mjs)：**改写整条声明面 → 清掉旧线的锁与树 → 裸 `npm install --ignore-scripts` → `verify`**（换线是整棵树搬家，旧锁/旧树会让 npm 直接 ERESOLVE，2026-10-05 巡检的 `committed` 就是这么红的）。
   - **假绿**：`npm install` 因上游 peer 冲突退出时，`node_modules` 会**原封不动停在旧版本**上，随后 typecheck 与全套测试全绿。所以换包之后必须 `verify` 断言实装版本 —— **「测试全绿」不等于「跑在目标版本上」**。
 
 ## 文档网络与自更新

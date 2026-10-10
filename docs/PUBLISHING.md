@@ -147,6 +147,7 @@ npm view dsh-zhihu-search dist-tags                           # alpha = 新号�
 - 新增可选开关（如「隐藏原生网页搜索」）→ 旧用法全部仍然正确，且能观察到新能力 → Q3 是 → minor。
 - 修复已发布功能里的逻辑缺陷（开关存了却不生效）→ 旧用法仍正确、只是真的开始工作 → Q1 否 Q3 否 → patch。
 - 补上漏声明的输出 schema 字段（宿主按 `additionalProperties: false` 校验，漏一处工具整体失败）→ 修复已发布缺陷 → patch；**发布后才发现**的回归另记[复盘](postmortem/2026-09-14-output-schema-drift.md)。
+- **把声明面下限抬到 RC 线起点**（追承诺线，本例中承诺线随宿主迁到了 RC 线上）→ Q0 是（`package.json` 在产物里）；Q1 否（旧宿主上插件照常运行，只是不再承诺那条线）；Q2 是（落在旧线上的使用者必须升级宿主）→ 按问题链默认落点是 major，**实践走 minor**，理由是没有任何配置或数据因此失效；**必须发版**。2026-10-10 判，连同换版脚本那条链的修复（`engines.dsh` 同进同退、清旧线残留、红线收紧为「逐字相同」）→ [决策记录](../.agents/notes/2026-10-10-declaration-floor-to-rc-line.md)与[另一篇](../.agents/notes/2026-10-10-swap-must-move-engines-dsh.md)。
 - 把密钥从设置字面量迁到凭据存储（启动期自动迁徙 + 卡片改走 `remote.credentials`）→ Q1 否（旧用法自动搬走，仍正确）Q3 是（密钥不再落 `settings.yaml`、徽标改问凭据域、只读遮蔽可见）→ **minor**。理由见[决策记录](../.agents/notes/2026-09-15-credential-store-migration.md)。2026-09-22 补记：迁徙此后只剩**组合配置**一条来源 —— 旧 `settings.yaml` 那半边随这次设置接缝换代（2026-09-22）一起消失（宿主按 section 名导入且只映射官方 section，结构上到不了本插件）。
 - **Q1 的边界：新增对某个平台服务的硬依赖**，若标准装配必然提供它、且依赖它的那一边在不满足时**整体不工作**（而不是退化成错误行为）→ 不算 Q1 的破坏。上一条即此例：`remote.credentials` 是官方 web 装配的必备件，缺它时新版卡片本就不工作，旧用法谈不上「变错」。前提不成立时（标准装配不保证提供该服务）仍按 Q1 判 major。
 - 修 v1.6.0 的卡片加载失败（`inject` 漏声明 `remote`，属性访问抛 `without inject`）→ 没有人**正确**的用法因此变错，也没有新能力 → Q1 否 Q3 否 → **patch**；**发布后才发现**的回归另记[复盘](postmortem/2026-09-15-client-inject-remote-missing.md)。
@@ -272,7 +273,7 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 
 ## 兼容性
 
-**声明面**只有一个事实来源：[package.json](../package.json) 的 `engines.dsh` 与 `peerDependencies`（两处形状必须一致，由 [test/redlines.test.ts](../test/redlines.test.ts) 断言）。依赖的是 DSH 的**运行时行为**：`schema.volatile()` 的活引用语义（`.get()`）、**只有 volatile 字段进配置页**、`settings.configure({ auto: false }, fiber)`、`ctx.on('loader/volatile-update', …)`、`role('secret')` 脱敏、**`ctx.inject` 的属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派（key = 包名，且**该槽不传 `form`**）、客户端服务 `ctx.configForms` 的 `get`/`getSnapshot`/`subscribe`/`mutate`、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、开关不生效、密钥读不到）。判断依据始终以 DSH 源码为准，不凭文档推断。
+**声明面**只有一个事实来源：[package.json](../package.json) 的 `engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*`（三个依赖段加起来；两处**逐字相同**，由 [test/redlines.test.ts](../test/redlines.test.ts) 断言）。依赖的是 DSH 的**运行时行为**：`schema.volatile()` 的活引用语义（`.get()`）、**只有 volatile 字段进配置页**、`settings.configure({ auto: false }, fiber)`、`ctx.on('loader/volatile-update', …)`、`role('secret')` 脱敏、**`ctx.inject` 的属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派（key = 包名，且**该槽不传 `form`**）、客户端服务 `ctx.configForms` 的 `get`/`getSnapshot`/`subscribe`/`mutate`、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、开关不生效、密钥读不到）。判断依据始终以 DSH 源码为准，不凭文档推断。
 
 **验证面**是 [compat.yml](../.github/workflows/compat.yml)。声明与验证必须对齐 —— 改动任意一边都要同步另一边。
 
@@ -288,7 +289,9 @@ DSH 至今全是 prerelease，版本号本身不构成承诺，tag 才是。三�
 
 **2026-09-24 承诺线迁回 `next`**：宿主把新线（rc 档）发在 `next` 上、`alpha` 停在旧档（具体值现查 `npm view @deepseek-ai/dsh dist-tags`；区间形状看 `package.json` 的 `engines.dsh` —— 承诺线是**推荐**线，声明面是**安装前提**，两者可以不一致），本仓推荐的配置界面下限已跟着迁到那条线，承诺线因此落在 `next`。**2026-09-22 那次对调**（此前 next 承诺、alpha 前瞻）理由不是口味：本仓的配置接缝只存在于 alpha 线上 —— 接缝换代之前 `next` 线上没有 `configForms` 那套配置面（卡片因此拿不到表单），声明面只能跟着 alpha 走。而一条**长期必红**的周更任务会让「红 = 出事」这个信号失效，所以判断哪条线是承诺线，判据是「声明面落在哪」，不是历史习惯。
 
-`latest` 为什么不可用：多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本，`@deepseek-ai/dsh` 自己那条也未必落在本插件的声明区间里 —— 逐包对照现查 `node scripts/compat-swap.mjs check latest`（`check` 收任意 dist-tag），宿主自己那条线现查 `npm view @deepseek-ai/dsh dist-tags`。按默认方式装宿主的人会落在声明范围之外，所以 [README](../README.md) 的前置版本必须写明装哪条线。
+**2026-10-10 下限抬到 RC 线起点**：承诺线 2026-09-24 就迁到 `next` 了，但下界一直停在 alpha 线那一段上，而 npm 的预发布语义让它**永远罩不住** `next` 上的版本（候选带预发布段时，只有区间里同一个 `major.minor.patch` 也带预发布段才允许匹配 —— 两段写在不同补丁位上就永远对不上）—— 于是 `declaration` 作业自迁线起**每周必红**（issue [#2](https://github.com/zlZayn/dsh-zhihu-search/issues/2) 就是它）。修法是把整条声明面的下界抬到那条线的起点，与姊妹仓 `dsh-ds-balance` 换线时的做法同型。同一条语义的固有代价：**宿主再往前推一个补丁位的预发布时，这条下界会再次罩不住**，届时要再抬一次 —— 这不是形状选错，是「跟预发布线」这件事本身的代价。
+
+`latest` 为什么不可用：多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本，`@deepseek-ai/dsh` 自己那条也未必落在本插件的声明区间里 —— 逐包对照现查 `node scripts/check-declaration.mjs --line latest`（那个脚本收任意 dist-tag），宿主自己那条线现查 `npm view @deepseek-ai/dsh dist-tags`。按默认方式装宿主的人会落在声明范围之外，所以 [README](../README.md) 的前置版本必须写明装哪条线。
 
 ### 红了怎么办（按线分流）
 
@@ -298,14 +301,16 @@ DSH 至今全是 prerelease，版本号本身不构成承诺，tag 才是。三�
 - **类型面红** → 上游 API 签名变了。定位到具体包与符号，改调用点使其**新旧都能编译**；做不到就说明下限必须抬高，那是 Q2 是 → **major，先问人类**。
 - **全量测试红** → **行为差异**，最重。按 [test/README.md](../test/README.md) 的分层定位：L3b/L6a 红说明平台语义变了，L1/L2 红则先怀疑换包装错了（那几层对宿主版本不敏感）。
 
-**`alpha` 红 = 记录，不阻断。**它已低于本仓声明的下限，换上去等于把依赖降到声明范围之外，红了通常只说明旧线上装不出新接缝 —— 那是**预期**，不是缺陷。这一类的价值只剩「旧线哪一步先坏」这份记录；不要按它去放宽声明（那会把使用者引到我们不再声明的线上）。
+**`alpha` 红 = 记录，不阻断。**它已不在本仓声明的区间里，换上去等于把依赖装到自己声明范围之外，红了通常只说明旧线上装不出新接缝 —— 那是**预期**，不是缺陷。这一类的价值只剩「旧线哪一步先坏」这份记录；不要按它去放宽声明（那会把使用者引到我们不再声明的线上）。
+**预期内还有两条**：换到那条线时 `npm install` 可能直接 ERESOLVE（旧线上的包内部 peer 图与新声明对不上），以及部分包在那条线上还停在更早的版本、于是**换完的清单里会出现两种区间**，那条「逐字相同」的红线随之红 —— 两者都是「我们不再支持那条线」的直接推论，不是新缺陷。
 
 ### 声明面变动要同步的地方
 
 - `peerDependencies` 的区间 → [README.md](../README.md) 与 [README_en.md](../README_en.md) 的「前置」版本（两份必同改）。
 - `engines.dsh` 的区间 → 两份 README 的「版本兼容」章节（那份章节只指真源，不抄版本）：它声明的是**实际验证过的最低宿主版本**与**排除下一个大版本的上界**。
-- **`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明形状必须一致**（2026-09-22 起：同一条区间字符串）→ 由 [test/redlines.test.ts](../test/redlines.test.ts) 的「声明面自洽」一组断言；改一处就要改全部，否则使用者按我们给的区间装出来的宿主可能没有本插件赖以工作的接缝。
-- [scripts/compat-swap.mjs](../scripts/compat-swap.mjs) 的换包写回是**保形**的：只替换区间里的下限版本，比较符与上界原样留下。别改成 `'^' + version` 那种硬编码 —— 它会把声明面在 CI 里悄悄变形，而人只看到 job 绿。
-- 声明面与「README 让用户去装的那条线」由 [compat.yml](../.github/workflows/compat.yml) 的 `declaration` 作业对账：它红了就是声明面落后，失败会开一条固定标题的跟踪 issue。**它只查承诺线（next）** —— 查一条我们不再声明的线，红只会变成每周的噪音。
-- 区间放宽本身不改行为（旧用法仍正确，只是允许更新的宿主）→ 按[版本号](#版本号)的 Q1/Q2 全否 → **patch**；但**必须发版**，声明在产物里。
+- **`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明必须逐字相同**（2026-10-10 起：同一条区间字符串，连上界与运算符一起比）→ 由 [test/redlines.test.ts](../test/redlines.test.ts) 的「声明面自洽」一组断言；改一处就要改全部，否则使用者按我们给的区间装出来的宿主可能没有本插件赖以工作的接缝。判据收紧过一次：从「下限不得低于」到「逐字相同」，理由见[决策记录](../.agents/notes/2026-10-10-swap-must-move-engines-dsh.md)。
+- [scripts/compat-swap.mjs](../scripts/compat-swap.mjs) 的换包写回是**保形**的：只替换区间里的下限版本，运算符与上界原样留下；它同时**一并改写 `engines.dsh`**、**清掉换线前的锁与树**、并自带 `verify` 核对实装版本。别改成 `'^' + version` 那种硬编码 —— 它会把声明面在 CI 里悄悄变形，而人只看到 job 绿。形状自检跑 `node scripts/compat-swap.mjs selftest`（[test/compat-swap.test.ts](../test/compat-swap.test.ts) 跑同一条）。
+- 声明面与「README 让用户去装的那条线」由 [compat.yml](../.github/workflows/compat.yml) 的 `declaration` 作业对账，判定实现**只有一处**：[scripts/check-declaration.mjs](../scripts/check-declaration.mjs)（`npm run check:declaration`，或 `--line <tag>` 换一条线判）。它红了就是声明面落后，失败会开一条固定标题的跟踪 issue。**它只查承诺线（next）** —— 查一条我们不再声明的线，红只会变成每周的噪音。
+- **区间放宽**本身不改行为（旧用法仍正确，只是允许更新的宿主）→ 按[版本号](#版本号)的 Q1/Q2 全否 → **patch**；但**必须发版**，声明在产物里。
+- **下限抬到某条线**是另一种情形：旧宿主上的用法仍然正确，但那条线上的使用者必须升级宿主才能用新版本 —— 这是 Q2 **是**，按问题链的默认落点是 major，实践上一般走 **minor**（不改任何配置或数据，只缩窄承诺面）。2026-10-10 那次即按 minor 发，理由与替代方案见[决策记录](../.agents/notes/2026-10-10-declaration-floor-to-rc-line.md)。
 - 已知缺口与待办见 [AGENTS.md](../AGENTS.md)。

@@ -72,85 +72,34 @@ describe('红线 1：@deepseek-ai/* 绝不进入 dependencies', () => {
   });
 });
 
-/**
- * 一个 semver 区间的下限：`[major, minor, patch, 预发布标识]`。
- *
- * 刻意只做本仓需要的那一档比较，不引 `semver` 依赖（它只是传递依赖，装不装得到不由我们决定）。
- * 判据是「下限不小于下限」，所以只需取区间里**第一个**版本号与它前面的比较符。
- *
- * @param range - 声明里的区间字符串。
- * @returns 解析出的下限，或解析不出来时的 undefined。
- */
-type Floor = readonly [number, number, number, string];
-
-function floorOf(range: string): Floor | undefined {
-  const match = /(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/.exec(range);
-  if (match === null) return undefined;
-  return [Number(match[1]), Number(match[2]), Number(match[3]), match[4] ?? ''];
-}
-
-/**
- * 按 semver 的次序比较两个下限。
- *
- * 预发布那一段按 §11 的规则比：**有预发布 < 无预发布**，标识符逐段比，数字段小于字母段。
- *
- * @param a - 左值。
- * @param b - 右值。
- * @returns 负数 / 0 / 正数，与 `Array.prototype.sort` 的约定一致。
- */
-function compareFloors(a: Floor, b: Floor): number {
-  if (a[0] !== b[0]) return a[0] - b[0];
-  if (a[1] !== b[1]) return a[1] - b[1];
-  if (a[2] !== b[2]) return a[2] - b[2];
-  if (a[3] === b[3]) return 0;
-  if (a[3] === '') return 1;
-  if (b[3] === '') return -1;
-  const left = a[3].split('.');
-  const right = b[3].split('.');
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const one = left[index];
-    const other = right[index];
-    if (one === undefined) return -1;
-    if (other === undefined) return 1;
-    if (one === other) continue;
-    const oneNumeric = /^\d+$/.test(one);
-    const otherNumeric = /^\d+$/.test(other);
-    if (oneNumeric && otherNumeric) return Number(one) - Number(other);
-    if (oneNumeric !== otherNumeric) return oneNumeric ? -1 : 1;
-    return one < other ? -1 : 1;
-  }
-  return 0;
-}
-
-describe('声明面自洽：任何 @deepseek-ai/dsh-* 的下限都不得低于 engines.dsh 的下限', () => {
-  // 这条是**跨仓规则 7**（见根目录 AGENTS.md 的逐条裁定）。此前写必红 —— 本仓声明停在 next 线、
-  // engines 下限在 alpha 线，两者矛盾。0.1.7-alpha.1 迁移把两条线合并到同一条上，它才立得起来。
-  //
+describe('声明面自洽：全部 dsh 声明与 engines.dsh 逐字相同', () => {
+  // 这条是**跨仓规则 7**（见根目录 AGENTS.md 的逐条裁定）。此前它写的是「下限不得低于」，
+  // 2026-10-10 收紧成**逐字相同** —— 理由有两条，各自都实测过：
+  //   1. **上界也是声明的一半**。本仓的形态是 `>=下限 <下一个大版本`，一条写成 `^0.2.0-rc.1`、
+  //      另一条写成 `>=0.2.0-rc.1 <0.3.0`，使用者按它们装到的宿主不是同一批，而「下限一致」看不出来。
+  //   2. **换版脚本曾经只动依赖段、漏掉 `engines.dsh`**（它不在任何依赖段里，名字也不带 `dsh-` 尾巴）。
+  //      旧判据下那种半换过的 manifest 照样全绿 —— 测试比文档里那句「同形状」弱，缺口就在这。
   // 为什么必须一致：使用者按我们给的区间装出来的宿主，未必有本插件赖以工作的宿主接缝，
   // 而接缝缺席是**静默**的（插件 pending、卡片不出现，都不报错）。
-  it('engines.dsh 与每条 dsh 声明的下限都取同一档，且不低于它', () => {
-    const floor = floorOf(packageJson.engines?.['dsh'] ?? '');
-    expect(floor, 'engines.dsh 读不出下限').toBeDefined();
-    expect(
-      floor![3],
-      'engines.dsh 的下限必须点名一条线（预发布标签），否则 next/alpha 会被混为一谈',
-    ).not.toBe('');
+  it('每条 @deepseek-ai/dsh-* 区间与 engines.dsh 逐字相同', () => {
+    const engine = packageJson.engines?.['dsh'];
+    expect(typeof engine === 'string' && engine !== '', 'engines.dsh 没声明').toBe(true);
+    // 下限必须点名一条线（预发布段）：写成裸 `>=0.2.0` 会让 next / alpha 两条线被混为一谈。
+    expect(engine, 'engines.dsh 的下限没有点名一条线').toMatch(
+      /^\s*(>=|\^|~|=)?\s*\d+\.\d+\.\d+-[0-9A-Za-z.-]+/,
+    );
 
-    const declared = [
-      ...Object.entries(packageJson.peerDependencies ?? {}),
-      ...Object.entries(packageJson.devDependencies ?? {}),
-    ].filter(([name]) => name.startsWith('@deepseek-ai/dsh-'));
-
+    const declared: string[] = [];
+    for (const field of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
+      for (const [name, range] of Object.entries(packageJson[field] ?? {})) {
+        if (name.startsWith('@deepseek-ai/dsh-')) declared.push(`${field}:${name} = ${range}`);
+      }
+    }
     // 扫不到声明说明匹配规则坏了，先红这个 —— 别让它静默变成一条永不触发的守卫。
     expect(declared.length).toBeGreaterThan(10);
-    for (const [name, range] of declared) {
-      const own = floorOf(range);
-      expect(own, `${name} 的区间读不出下限：${range}`).toBeDefined();
-      expect(
-        compareFloors(own!, floor!),
-        `${name} 声明 ${range}，低于 engines.dsh 的下限`,
-      ).toBeGreaterThanOrEqual(0);
-    }
+
+    const offenders = declared.filter((entry) => !entry.endsWith(' = ' + engine));
+    expect(offenders, `这些声明与 engines.dsh（${engine}）不同形状或不同区间`).toEqual([]);
   });
 });
 

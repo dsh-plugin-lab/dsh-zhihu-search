@@ -31,6 +31,15 @@
 # **README 告诉用户去装的那条线**」。那条线现在就是 next（本仓推荐的配置界面下限也在那里），
 # 所以它**只查 next** —— 查一条我们自己都不再声明的线，红只会变成每周的噪音。
 #
+# ## 换线是「整棵树搬家」，两件事必须由脚本自己保证
+#
+#  1. **声明面整条同进同退**：`engines.dsh` 既不在依赖段里、名字也不带 `dsh-` 尾巴，
+#     所以换包脚本单独处理它；只换依赖段会让 redlines 的「逐字相同」**每周必红**，
+#     而那一条亮的恰好是能盖住真正不兼容点的位置。
+#  2. **清掉换线前的残留再装**：一棵旧线的 `package-lock.json`（或装了旧树的 node_modules）
+#     会让 `npm install` 直接 ERESOLVE，而失败之后 node_modules 停在旧版本上，后面每一步都绿。
+#     清锁清树写在 `swap` 里，本地复现与 CI 走同一条路径。
+#
 # 不挂 push：这条线看的是**上游**动没动，本地提交改不了结论。
 name: Compat
 
@@ -58,17 +67,21 @@ jobs:
         with:
           node-version-file: .node-version
 
-      # 不装任何东西：判据是「我们声明的区间能取到的最新版本」与「tag 指向的版本」是否同一个。
+      # 不装任何东西：判据是「我们声明的区间能覆盖这条线上的版本」。
       #
       # **只查 next**：根 README 的「版本兼容」告诉使用者，需要配置界面就把宿主升到
-      # package.json 的 engines.dsh 声明的版本 —— 那个版本只在 next 线上，而声明面本身
-      # 也落在那里。判据是「声明区间必须罩得住我们告诉用户去装的那条线」。
+      # package.json 的 engines.dsh 声明的版本 —— 那条线就是 next，而声明面本身也落在那里。
+      # 判据是「声明区间必须罩得住我们告诉用户去装的那条线」。
+      #
+      # 判据只有一处实现（[scripts/check-declaration.mjs] 的 TRACKED_LINE = next）：它同时看
+      # `engines.dsh` 与三个依赖段里每一条 `@deepseek-ai/dsh-*`，而换包脚本那边**不再自带
+      # 一份同名判定** —— 两份实现判同一件事，迟早会各红各的。
       #
       # 曾经两条线都查。2026-09-22 起只查当时的承诺线 alpha；现在承诺线回到 next，而 alpha 那条已低于我们的下限，
       # 于是**长期必红**，而长期必红会让信号失效。
       - name: Declaration surface — the line the README points users at (next)
         id: declared
-        run: node scripts/compat-swap.mjs check next
+        run: node scripts/check-declaration.mjs
 
       - name: Summarize
         if: always()
@@ -114,19 +127,22 @@ jobs:
       # 刻意**不跑 npm ci**：要的是一棵按新声明重新解析出来的树。先 ci 再改，npm 会拿旧树去
       # reconcile，实测直接 ERESOLVE（exit 1）并且 node_modules 原封不动停在旧版本上 ——
       # 后面的测试于是全绿，报出一个假兼容。
-      # 换包只替换区间里的**下限版本**，比较符与上界原样保留 —— 声明面不会在 CI 里悄悄变形。
-      - name: Swap the declared ranges onto the legacy alpha line
-        run: node scripts/compat-swap.mjs swap alpha
-
-      # --ignore-scripts 是必须的：本包的 prepare 会跑 npm run build（内含 tsc），
+      #
+      # 一棵换线前的 `package-lock.json` 同样会挡住解析（2026-10-05 实测：锁把旧线的
+      # `dsh-sandbox-policy` 钉在那里，它要的 `dsh-agent` 与根声明的新区间对不上
+      # → ERESOLVE，后面每一步全塌）。清锁清树因此写进 `swap` 自己：
+      # 本地复现与 CI 走同一条路径，不指望调用方记得。
+      #
+      # 换包只替换区间里的**下限版本**，运算符与上界原样保留 —— 声明面不会在 CI 里悄悄变形；
+      # `engines.dsh` 与依赖段同进同退，否则 redlines 的「逐字相同」每周必红。
+      #
+      # 这一步同时完成「装」与「核对实装版本」（`swap` 内部先跑裸 npm install，再跑 verify）：
+      # 分开写会留下「只跑了前半段」的口子，而 npm install 失败时 node_modules 会停在旧版本上，
+      # 让后面每一步都绿。`--ignore-scripts` 是必须的：本包的 prepare 会跑 npm run build（内含 tsc），
       # 类型面一漂移 tsc 就非零退出，install 本身失败，什么也测不到。构建由下面的步骤显式驱动。
-      - name: Install
-        run: npm install --ignore-scripts --no-audit --no-fund
-
-      # 换包没生效就必须红：旧版本装在那里会让后面每一步都绿。
-      - name: Verify the swap actually took effect
+      - name: Swap onto the legacy alpha line, install, and confirm what got installed
         id: verify
-        run: node scripts/compat-swap.mjs verify alpha
+        run: node scripts/compat-swap.mjs swap alpha
 
       - name: Typecheck
         id: typecheck
@@ -161,7 +177,7 @@ jobs:
             echo ""
             echo "| 步骤 | 结果 |"
             echo "| --- | --- |"
-            echo "| 换包 + 核对装出来的版本 | ${{ steps.verify.outcome }} |"
+            echo "| 换包 + 安装 + 核对装出来的版本 | ${{ steps.verify.outcome }} |"
             echo "| 类型面（npm run typecheck） | ${{ steps.typecheck.outcome }} |"
             echo "| 全量测试（npm test） | ${{ steps.suite.outcome }} |"
             if [ -n "${{ steps.diagnose.outcome }}" ] && [ "${{ steps.diagnose.outcome }}" != "skipped" ]; then
@@ -183,7 +199,7 @@ jobs:
             echo "   - **全量测试红** → **行为差异**，最重。按 test/README.md 的分层定位："
             echo "     L3b/L6a（native-web-tools / client-bundle / dist）说明平台语义变了；L1/L2 红则先怀疑"
             echo "     换包装错了 —— 那几层对宿主版本不敏感。"
-            echo "2. 本地复现：clone 之后照本 job 的步骤跑一遍（swap → npm install --ignore-scripts → verify）。"
+            echo "2. 本地复现：clone 之后跑一遍 `node scripts/compat-swap.mjs swap <线>`（它自己改写声明面、清旧线残留、装、再核对）。"
             echo "3. 修 → 按 docs/PUBLISHING.md 定档 → 发版 → 等下一轮。"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -211,27 +227,26 @@ jobs:
           node-version-file: .node-version
           cache: npm
 
-      # 与 alpha 线（旧线）**同一套机制**，只差 install 不加 --force。
+      # 刻意**不跑 npm ci**：要的是一棵按新声明重新解析出来的树。先 ci 再改，npm 会拿旧树去
+      # reconcile，实测直接 ERESOLVE（exit 1）并且 node_modules 原封不动停在旧版本上 ——
+      # 后面的测试于是全绿，报出一个假兼容。
       #
-      # 为什么这里不加 --force：2026-09-24 实测两条线都装得干净 —— swap 之后各自
-      # `npm install --ignore-scripts --no-audit --no-fund --dry-run` 都 rc=0、解析出同样的 109 个包；
-      # 当时留 force 的理由（旧线上包**内部** peer 图未定型、install 直接 ERESOLVE 退出）
-      # 在这两个版本上已不成立，而 --force 会把**真实**的 peer 冲突一起吞掉，正好造出「假绿」。
-      # 将来若有线真的 ERESOLVE：把 --force 加回那一条，并在本条注释里写明是哪条线、哪个包。
+      # 一棵换线前的 `package-lock.json` 同样会挡住解析（2026-10-05 实测：锁把旧线的
+      # `dsh-sandbox-policy` 钉在那里，它要的 `dsh-agent` 与根声明的新区间对不上
+      # → ERESOLVE，后面每一步全塌）。清锁清树因此写进 `swap` 自己：
+      # 本地复现与 CI 走同一条路径，不指望调用方记得。
       #
-      # ⚠ 绝不要退回 npm install <包>@next：
-      #   - 不点名的那个包的目录会被清空（实测 dsh-client-locale / dsh-client-ui-primitives 都中过），
-      #     随后 typecheck 报「找不到模块」，是与上游无关的假红；
-      #   - 加 --legacy-peer-deps 更糟：它连 npm 的 **peer 自动安装**一起关掉，dsh-tools 自己的
-      #     peer（dsh-sandbox / dsh-sandbox-policy / dsh-ptc-runtime）一个都不装，
-      #     6 个测试文件以「Cannot find package @deepseek-ai/dsh-sandbox」假红（2026-09-16 实测）。
-      - name: Swap the declared ranges onto the next line
+      # 换包只替换区间里的**下限版本**，运算符与上界原样保留 —— 声明面不会在 CI 里悄悄变形；
+      # `engines.dsh` 与依赖段同进同退，否则 redlines 的「逐字相同」每周必红。
+      #
+      # 这一步同时完成「装」与「核对实装版本」（`swap` 内部先跑裸 npm install，再跑 verify）：
+      # 分开写会留下「只跑了前半段」的口子，而 npm install 失败时 node_modules 会停在旧版本上，
+      # 让后面每一步都绿。`--ignore-scripts` 是必须的：本包的 prepare 会跑 npm run build（内含 tsc），
+      # 类型面一漂移 tsc 就非零退出，install 本身失败，什么也测不到。构建由下面的步骤显式驱动。
+      - name: Swap onto the next line, install, and confirm what got installed
         id: verify
         continue-on-error: true
-        run: |
-          node scripts/compat-swap.mjs swap next
-          npm install --ignore-scripts --no-audit --no-fund
-          node scripts/compat-swap.mjs verify next
+        run: node scripts/compat-swap.mjs swap next
 
       - name: Typecheck
         id: typecheck
@@ -261,7 +276,7 @@ jobs:
             echo ""
             echo "| 步骤 | 结果 |"
             echo "| --- | --- |"
-            echo "| 换包 + 核对装出来的版本 | ${{ steps.verify.outcome }} |"
+            echo "| 换包 + 安装 + 核对装出来的版本 | ${{ steps.verify.outcome }} |"
             echo "| 类型面 | ${{ steps.typecheck.outcome }} |"
             echo "| 全量测试 | ${{ steps.suite.outcome }} |"
             if [ -n "${{ steps.diagnose.outcome }}" ] && [ "${{ steps.diagnose.outcome }}" != "skipped" ]; then
@@ -278,7 +293,7 @@ jobs:
             echo "   - **全量测试红** → **行为差异**，最重。按 test/README.md 的分层定位："
             echo "     L3b/L6a（native-web-tools / client-bundle / dist）说明平台语义变了；L1/L2 红则先怀疑"
             echo "     换包装错了 —— 那几层对宿主版本不敏感。"
-            echo "2. 本地复现：clone 之后照本 job 的步骤跑一遍（swap → npm install --ignore-scripts → verify）。"
+            echo "2. 本地复现：clone 之后跑一遍 `node scripts/compat-swap.mjs swap <线>`（它自己改写声明面、清旧线残留、装、再核对）。"
             echo "3. 修 → 按 docs/PUBLISHING.md 定档 → 发版 → 等下一轮。"
           } >> "$GITHUB_STEP_SUMMARY"
 
