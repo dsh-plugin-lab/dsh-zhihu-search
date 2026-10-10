@@ -105,7 +105,7 @@
 
 ### 前置
 
-- **DSH 的区间见 [package.json](package.json) 的 `engines.dsh`** —— 那是唯一真源，它与全部 27 条 `@deepseek-ai/dsh-*` 声明**逐字相同**（不同形状时使用者装到的宿主可能缺接缝，而接缝缺席是**静默**的：配置界面不出现、宿主不报错）。本文件与 [README_en.md](README_en.md) 都不抄那个会漂的值。
+- **DSH 的区间见 [package.json](package.json) 的 `engines.dsh`** —— 那是唯一真源，它与全部 27 条 `@deepseek-ai/dsh-*` 声明**逐字相同**（不同形状时使用者装到的宿主可能缺接缝，而接缝缺席是**静默**的：配置界面不出现、宿主不报错）。它同时承诺**两族**宿主预发布（新 RC 族与仍可用的旧 RC 族，用 `||` 显式枚举 —— npm 只在同一 `major.minor.patch` 的预发布之间匹配，单区间罩不住两族），装哪一族由它说了算。本文件与 [README_en.md](README_en.md) 都不抄那个会漂的值。
 - Node `>= 20`
 
 装宿主时**要显式指定版本线**：本家族的 `latest` 标签不可靠（多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本），按默认方式装可能落在声明范围之外 —— 现查 `npm view @deepseek-ai/dsh dist-tags`。

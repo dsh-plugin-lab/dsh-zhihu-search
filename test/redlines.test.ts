@@ -5,6 +5,7 @@
  * 每条 `it` 对应一条红线，另外几组（文档不抄实测值等）是与红线同级的可执行约定。
  */
 
+import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -29,6 +30,27 @@ const packageJson = JSON.parse(
   devDependencies?: Record<string, string>;
   engines?: Record<string, string>;
 };
+
+/**
+ * 读**已提交**的那份 package.json（`git show HEAD:package.json`）。
+ *
+ * 为什么需要它：compat 巡检的 `swap --only` 会把工作区清单**临时收窄成单族**去测低族，
+ * 那是一次性测量、不提交。凡是判「**对外承诺了什么**」的断言都必须读这一份，否则测量会误报成缺陷
+ * （实测：`swap 0.1.7-rc --only` 之后工作区只剩一族，而声明面并没有缩窄）。
+ * 无 git 的检出（发布 tarball 等）读不到时返回 `undefined`，调用方自行决定降级。
+ */
+function readCommittedPackageJson(): { engines?: Record<string, string> } | undefined {
+  try {
+    const result = spawnSync('git', ['show', 'HEAD:package.json'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    if (result.status !== 0 || typeof result.stdout !== 'string') return undefined;
+    return JSON.parse(result.stdout) as { engines?: Record<string, string> };
+  } catch {
+    return undefined;
+  }
+}
 
 /** 构造全部三个工具，用于检查模型可见面。 */
 function allTools() {
@@ -72,22 +94,29 @@ describe('红线 1：@deepseek-ai/* 绝不进入 dependencies', () => {
   });
 });
 
-describe('声明面自洽：全部 dsh 声明与 engines.dsh 逐字相同', () => {
+describe('声明面自洽：全部 dsh 声明与 engines.dsh 逐字相同，且承诺的族不只一族', () => {
   // 这条是**跨仓规则 7**（见根目录 AGENTS.md 的逐条裁定）。此前它写的是「下限不得低于」，
   // 2026-10-10 收紧成**逐字相同** —— 理由有两条，各自都实测过：
-  //   1. **上界也是声明的一半**。本仓的形态是 `>=下限 <下一个大版本`，一条写成 `^0.2.0-rc.1`、
+  //   1. **上界也是声明的一半**。本仓的形态是 `>=下限 <下一族`，一条写成 `^0.2.0-rc.1`、
   //      另一条写成 `>=0.2.0-rc.1 <0.3.0`，使用者按它们装到的宿主不是同一批，而「下限一致」看不出来。
   //   2. **换版脚本曾经只动依赖段、漏掉 `engines.dsh`**（它不在任何依赖段里，名字也不带 `dsh-` 尾巴）。
   //      旧判据下那种半换过的 manifest 照样全绿 —— 测试比文档里那句「同形状」弱，缺口就在这。
   // 为什么必须一致：使用者按我们给的区间装出来的宿主，未必有本插件赖以工作的宿主接缝，
   // 而接缝缺席是**静默**的（插件 pending、卡片不出现，都不报错）。
+  //
+  // 「不只一族」这一条来自同一个预发布语义：npm 只在区间里存在**同元组**的预发布项时才匹配预发布候选，
+  // 所以要同时承诺 0.1.7 与 0.2.0 两族，单区间罩不住 —— 必须用 `||` 显式枚举成并集。
+  // 这条断言在「逐字相同」之外再钉住**族集合**：防止有人把某一族的分支悄悄删掉（那等于
+  // 缩窄了对外承诺却不改任何别的地方）。
   it('每条 @deepseek-ai/dsh-* 区间与 engines.dsh 逐字相同', () => {
     const engine = packageJson.engines?.['dsh'];
     expect(typeof engine === 'string' && engine !== '', 'engines.dsh 没声明').toBe(true);
-    // 下限必须点名一条线（预发布段）：写成裸 `>=0.2.0` 会让 next / alpha 两条线被混为一谈。
-    expect(engine, 'engines.dsh 的下限没有点名一条线').toMatch(
-      /^\s*(>=|\^|~|=)?\s*\d+\.\d+\.\d+-[0-9A-Za-z.-]+/,
-    );
+    // 每个分支的下限必须带预发布段（写成裸版本号会让 next / alpha 两条线被混为一谈）。
+    for (const branch of (engine ?? '').split('||')) {
+      expect(branch.trim(), 'engines.dsh 的某一族下限没有点名一条线').toMatch(
+        /^(>=|\^|~|=)?\s*\d+\.\d+\.\d+-[0-9A-Za-z.-]+/,
+      );
+    }
 
     const declared: string[] = [];
     for (const field of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
@@ -100,6 +129,27 @@ describe('声明面自洽：全部 dsh 声明与 engines.dsh 逐字相同', () =
 
     const offenders = declared.filter((entry) => !entry.endsWith(' = ' + engine));
     expect(offenders, `这些声明与 engines.dsh（${engine}）不同形状或不同区间`).toEqual([]);
+  });
+
+  it('engines.dsh 同时承诺 0.1.7 与 0.2.0 两族（|| 并集），删掉一族等于缩窄对外承诺', () => {
+    // 为什么钉这一条：0.1.7 那族是**真实兼容修复**（有使用者停在 0.1.7，2.1.0 抬下限把他们判不兼容，
+    // 本次加回）。删掉它会让那批使用者再次装不上，而且没有任何别的地方会红。
+    //
+    // 读**已提交**的那份声明（`git show HEAD:package.json`），且**只在读得到时判**：compat 巡检的
+    // `swap --only` 会把工作区清单**临时收窄成单族**去测低族，那是一次性测量、不提交。若读工作区
+    // 就会把测量误报成「声明面缩窄」（实测：`swap --only` 之后工作区只剩一族，而承诺并未变）。
+    // 无 git 时（本条只在有历史记录的检出里成立）读不到已提交那份 —— 跳过本条而不是误判，
+    // 因为「已提交的承诺」这一对象在无 git 时不存在。字节相等的红线在无 git 时仍照常判工作区。
+    const committed = readCommittedPackageJson();
+    if (committed === undefined) return; // 读不到已提交声明 —— 跳过，不误判工作区（见注释）
+    const engine = committed.engines?.['dsh'] ?? '';
+    const families = engine
+      .split('||')
+      .map((branch) => /(\d+)\.(\d+)\.(\d+)/.exec(branch)?.[0])
+      .filter((tuple): tuple is string => tuple !== undefined);
+    expect(families, 'engines.dsh 读不出任何族').toHaveLength(2);
+    expect(families).toContain('0.1.7');
+    expect(families).toContain('0.2.0');
   });
 });
 
@@ -387,8 +437,14 @@ describe('文档不抄实测值', () => {
     expect(files.length).toBeGreaterThan(10);
 
     for (const file of files) {
+      const isWorkflow = file.startsWith('.github/workflows/');
       const lines = readFileSync(root + file, 'utf8').split('\n');
       lines.forEach((line, index) => {
+        // workflow 里只扫**注释行**：那里的文字是给人读的用法说明（会漂、该指真源）。
+        // 非注释行是**机器消费的输入** —— 矩阵值、步骤名、run 命令 —— 与 [package.json](../package.json)
+        // 同一类（声明面本身就是真源，它当然含版本号）。本仓确实需要一处：compat.yml 的矩阵用
+        // **版本前缀**定位一个没有 dist-tag 的族（`0.1.7-rc`），那是配置而非散文。
+        if (isWorkflow && !line.trimStart().startsWith('#')) return;
         for (const value of line.match(HOST_VERSION) ?? []) {
           if (FACADE.includes(file) && line.includes(HOME)) continue;
           throw new Error(

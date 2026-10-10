@@ -14,7 +14,7 @@
 - 对外可见行为变化，同一次改动内同步 [README.md](README.md) 与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 改根 [README.md](README.md) 必同改 [README_en.md](README_en.md)，冲突以中文为准
 - 「版本兼容」章节只讲分水岭与真源指针，**不抄会漂的宿主版本**；判据：`engines.dsh` 一旦落后于实际部署的宿主线（[compat.yml](.github/workflows/compat.yml) 的 declaration 作业转红即为信号），该章与两份 README 的「前置」必须同批复核
-- **声明面应当自洽**：`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明（9 条 peer + 18 条 dev，去重后 18 个包）**逐字相同**（同形状、同区间）。两份声明矛盾时，使用者按我们给的区间装出来的宿主未必有本插件赖以工作的设置接缝，而接缝缺席是**静默**的（配置页不出现、宿主不报错）。由 [test/redlines.test.ts](test/redlines.test.ts) 的「声明面自洽」一组断言钉住。**2026-10-10 起判据是「逐字相同」**，此前只要求「下限不低于」—— 那比这段散文弱了两层：上界也是声明的一半，而换版脚本曾经漏掉 `engines.dsh`（它不在依赖段里、名字也不带 `dsh-` 尾巴）。理由是[决策记录](.agents/notes/2026-10-10-swap-must-move-engines-dsh.md)；下限落在哪条线上见[另一篇](.agents/notes/2026-10-10-declaration-floor-to-rc-line.md)
+- **声明面应当自洽**：`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明（9 条 peer + 18 条 dev，去重后 18 个包）**逐字相同**（同形状、同区间）。两份声明矛盾时，使用者按我们给的区间装出来的宿主未必有本插件赖以工作的设置接缝，而接缝缺席是**静默**的（配置页不出现、宿主不报错）。由 [test/redlines.test.ts](test/redlines.test.ts) 的「声明面自洽」一组断言钉住（判据 2026-10-10 从「下限不低于」收紧为「逐字相同」，因为上界也是声明的一半；同一批还把换版脚本曾经漏掉 `engines.dsh` 的缺口补上，理由见[决策记录](.agents/notes/2026-10-10-swap-must-move-engines-dsh.md)）。**声明面是若干个族（`||`）的并集**（要同时承诺两族，npm 的预发布语义下必须枚举成并集），换版语义随之是「保留旧族、只替换目标族」，巡检矩阵 = **声明面承诺哪些族就测哪些族**（承诺一族 = 声明面加一族 + [compat.yml](.github/workflows/compat.yml) 矩阵加一行；两族的理由与代价见[决策记录](.agents/notes/2026-10-10-two-families-declared.md)，换包脚本的族机制见[另一篇](.agents/notes/2026-10-10-swap-moves-family.md)）
 - **依赖写在 peer 还是 dev，判据是「我们与它的关系」，不是它住在哪一侧** —— 两类，缺一类就会出事：
   - **只做类型面（module augmentation）、我们只 `import type`** → 只写 `devDependencies`。现有两个：
     客户端的 `@deepseek-ai/dsh-client-ui-plugin-manager`（运行时关系由 `dsh.client.inject` 表达，peer 是重复声明）、
@@ -51,7 +51,7 @@
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）· `npm run test:contract`（打真实接口，需 `ZHIHU_ACCESS_SECRET`，日常 CI 不跑）
 - 真机验收：`ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]` —— 默认验 profile 里装的那份，覆盖真实接口 + 宿主 schema 校验 + 渲染文本，见 [scripts/README.md](scripts/README.md)
 - **发版两步，顺序是死的**：① 本地 `npm version <档位> [--preid=alpha] --no-git-tag-version` → `git commit`；② `gh workflow run release.yml`（**没有 tier 参数** —— workflow 只发 `package.json` 里那个号，它不 bump）。档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定；**dist-tag 由版本自己那段推**（`2.0.0-alpha.1` → `alpha`，稳定档 → `latest`）；同一条 X.Y.Z 线上推下一个 alpha 要用 `prerelease`，不是 `premajor`（后者开新线，从 `2.0.0-alpha.0` 会得到不可覆盖的 `3.0.0-alpha.0`）；无行为变更时 [守卫](scripts/release-guard.mjs) 会拦下（`-f force=true` 才能越过）
-- 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap next` —— 一条命令走完「改写整条声明面 → 清掉旧线的锁与树 → 裸 `npm install --ignore-scripts` → 核对实装版本」，`verify next` 可以单独再跑一次。[scripts/README.md](scripts/README.md) 有全部子命令
+- 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap <线>` —— 一条命令走完「改写整条声明面 → 清掉旧线的锁与树 → 裸 `npm install --ignore-scripts` → 核对实装版本」；测某一族（尤其低族）时加 `--only <前缀>` 临时把声明面收窄成单族（并集区间会被 npm 解析成装最高族，不收窄就测不到低族）。全部子命令见 [scripts/README.md](scripts/README.md)
 
 ## 验证快照（定性结论出自 2026-09-16 实跑；2026-09-24 复核过 main 的 CI、tag `v2.0.0` 与 npm `latest`，结论未变）
 
@@ -77,7 +77,7 @@
 - **文档校验脚本还没落进本仓**：AGENTS 的「能落成校验的不写散文」这条目前对文档是空的（链接与行尾没有执行体）。容器仓 `dsh-plugins/scripts/check-links.py` 是本机可用的实现，收进来时要顺带回答「CI 跑不跑它」（`ci.yml` 现在没有 docs 步骤）
 - **`prepare` 与 `dsh-ds-balance` 相反，本仓零解释**：本仓 `package.json` 声明 `"prepare": "npm run build"`，而 DSB 明文「本仓**不**声明 `prepare` —— 声明了 CI 的 `npm ci` 会先产出 `lib/`，`artifacts.test.ts` 那种『干净检出』判据就永远绿不到点上（那边踩过，见其决策记录）」。两仓同源，一个声明一个刻意不声明。**要么删掉本仓的 `prepare`，要么写清本仓为什么例外**（例如 profile 用 `link:` 挂载时依赖它保证产物新鲜）—— 属跨仓取舍，未裁
 
-- **下限已抬到 RC 线起点（2026-10-10），下一轮的触发点与判据**：声明面见 [package.json](package.json) 的 `engines.dsh`。**宿主再往前推一个补丁位的预发布**（同一个 `major.minor.patch` 之外）时，同一条预发布语义会让这条下限再次罩不住 —— 届时 `node scripts/check-declaration.mjs` 先红，处理链按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」（抬下限属 Q2 口径，档位按问题链定，别照抄上次的 minor）
+- **宿主推出新族（新的 major.minor.patch 预发布）时的处置**：声明面是并集，**不会自动罩住**新族。要不要加承诺是人工决定 —— 加则**手动**两处（[package.json](package.json) 的 `engines.dsh` 与 27 条声明加一族；[compat.yml](.github/workflows/compat.yml) 的测试矩阵加一行），之后 CI 自动跑；不加则那一族不在承诺内、也不测。判据与代价见[决策记录](.agents/notes/2026-10-10-two-families-declared.md)
 
 ## 活跃坑（工具链与 DSH 平台）
 

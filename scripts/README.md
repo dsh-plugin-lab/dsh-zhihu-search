@@ -19,13 +19,17 @@
 - `acceptance.mjs`：**验收脚本**。对指定包目录的产物打真实接口，验三件事：下限扩池、输出面与排序档位对称、`site` 归一化；每条都过一遍宿主的 `output.schema` 校验器，并打印模型可见文本。
   用法 `ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]`，默认验本机 profile 里装的那份；退出码非 0 即有未通过项。
   为什么它必须存在：单元测试读的是 `execute()` 的返回值，既不过宿主那道校验，也拿不到渲染文本 —— v1.4.0 的 P0 正是漏在这条缝里（[复盘](../docs/postmortem/2026-09-14-output-schema-drift.md)）。
-- `compat-swap.mjs`：**兼容性换包**。把 DSH 的**整条声明面**就地换到某条 dist-tag 线上（`next` / `alpha` / `latest`），交给 [compat.yml](../.github/workflows/compat.yml) 去跑现有测试。
-  子命令三条：`swap <tag>`（一条命令走完四步，见下）、`verify <tag>`（只核对，不改任何东西）、`selftest`（形状表与整份换版的离线自检）。
+- `compat-swap.mjs`：**兼容性换包**。把 DSH 的**整条声明面**就地换到某条 dist-tag 线（`next` / `alpha` / `latest`）或某个**版本前缀**代表的族上，交给 [compat.yml](../.github/workflows/compat.yml) 去跑现有测试。
+  子命令三条：`swap <线> [--drop <前缀> | --only <前缀>]`（一条命令走完四步，见下）、`verify <线>`（只核对）、`selftest`（形状表与整份换版的离线自检）。
   `swap` 的四步是**一次**动作，拆开写就会留下「只跑了前半段」的口子：
-  1. **改写声明面**：三个依赖段里每条 `@deepseek-ai/dsh-*` **外加 `engines.dsh`**（宿主本体既不在依赖段里、名字也不带 `dsh-` 尾巴，所以单独处理；manifest 缺这个键直接抛错，不把声明面落在半路）。写回是**保形**的：只换区间里的下限版本，运算符与上界原样留下（`>=… <下一个大版本>` 换完仍是同一形状）；认不出的形状（`||` / `*` / `1.x` / `workspace:^`）报错停下。
+  1. **改写声明面**：三个依赖段里每条 `@deepseek-ai/dsh-*` **外加 `engines.dsh`**（宿主本体既不在依赖段里、名字也不带 `dsh-` 尾巴，所以单独处理；manifest 缺这个键直接抛错，不把声明面落在半路）。
   2. **清掉换线前的残留**：`package-lock.json` 与 `node_modules`。换线是**整棵树搬家** —— 旧锁记着旧线的解析、旧树装着旧线的包，拿着它们去装新声明的 manifest 会直接 ERESOLVE（2026-10-05 巡检的 `committed` 就是这么红的）。
   3. **裸 `npm install`**：固定带 `--ignore-scripts`（本包声明了 `prepare` = `npm run build`，不带它 install 会先 build，类型面一漂移 install 自己就挂，类型面与行为面再也分不开）；`--legacy-peer-deps` / `--force` 一律不用，理由见脚本头部注释（实测结论，不是推断）。
-  4. **`verify` 核对实装版本**：先验 `engines.dsh`，再逐包断言 `node_modules` 里的版本就是 tag 上的版本。它自己有独立价值 —— `npm install` 会**假绿**（失败但树停在旧版本上，随后测试全绿）。
+  4. **`verify` 核对实装版本**：先验 `engines.dsh`，再逐包断言 `node_modules` 里的版本就是目标线的版本。它自己有独立价值 —— `npm install` 会**假绿**（失败但树停在旧版本上，随后测试全绿）。
+  **声明面是若干个族（`||`）的并集**，换版语义是「**保留旧族、只替换目标族**」：按「元组相同」定位要换的那一族，其余族原样留着。两个改族集合的开关：
+  - `--drop <前缀>`：显式删掉一族（换线到新族、放弃旧族时用）。
+  - `--only <前缀>`：**测某一族时把声明面临时收窄成只有那一族**。为什么必需 —— 并集区间对 npm 的含义是「这几族都合法」，它给每个包选的是**匹配集里最高**的那族（实测 2026-10-10：保留两族换到低族时装到的仍是最高族，`verify` 18 项全红）。收窄后的清单是一次性的，**不提交**（提交的那份始终是并集声明面 —— 那是给使用者的承诺）。
+  线的参数既收 dist-tag 也收**版本前缀**（如某条旧 RC 族）—— 实测没有任何 dist-tag 指向某些族，此时用前缀定位「该前缀下最高的已发布版本」。
   为什么是「改写 package.json + 裸 `npm install`」而不是 `npm install <包>@<tag>`：后者会清空某个恰好没被点名的包的目录（实测 `dsh-client-locale` / `dsh-client-ui-primitives` 都中过），是假红；正路与全部实测理由见脚本头部注释。
 
 - `check-declaration.mjs`：**声明面判定**（与 [compat.yml](../.github/workflows/compat.yml) 的 `declaration` 作业同一实现，也是这件事**唯一**的实现 —— `compat-swap.mjs` 不再自带一份同名判定）。只读 `package.json`、再问 npm，断言「我们声明的区间还罩不罩得住**承诺线**」，并同时看 `engines.dsh` 与三个依赖段里的每一条。

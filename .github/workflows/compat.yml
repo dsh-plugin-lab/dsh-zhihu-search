@@ -8,12 +8,15 @@
 # DSH 至今没有正式版，版本号本身不构成承诺，tag 才是。三个 tag 的语义**各不相同**
 # （@deepseek-ai/dsh-* 全家族一致）：
 #
-#   next   —— **当前承诺线**。2026-09-24 起本仓的声明面（engines.dsh 与全部 27 条
-#             @deepseek-ai/dsh-* 声明）落在这一条上，形状见 package.json。
-#             使用者按我们给的区间装得到、我们也只测这条线。
-#   alpha  —— **已低于本仓声明的下限**（具体值现查 npm view @deepseek-ai/dsh dist-tags）。
-#             换到它上面等于把依赖降到自己的声明范围之外，所以它不再是 pass/fail 信号，
-#             只留一个「旧线还能不能跑」的记录（见下面 record job）。
+#   next   —— **当前承诺线**。声明面（engines.dsh 与全部 27 条
+#             @deepseek-ai/dsh-* 声明）里的 RC 族落在这一条上，形状见 package.json。
+#             使用者按我们给的区间装得到、我们也只把它当必保的一条测。
+#   旧 RC 族 —— 声明面里**承诺的第二族**（有真实使用者停在那里，见 .agents/notes/）。
+#             实测**没有任何 dist-tag 指向它**，所以 compat-swap 用**版本前缀**定位这一族
+#             （前缀值写在下面 record 矩阵里，那是机器消费的输入，不是散文）。
+#             跑在 record 矩阵里（只记录不阻断），但它红要当回事 —— 那是对外承诺坏了。
+#   alpha  —— 宿主早已停发的旧线，**不在**本仓声明面里（换到它上面等于装到我们不承诺的宿主）。
+#             换包 + 跑全套；红了**只记录**（见下面 record job）。
 #   latest —— **不可用**：多数 @deepseek-ai/dsh-* 包上它指向很早的版本，@deepseek-ai/dsh 自己
 #             那条也未必落在本插件的声明里（具体值现查 npm view @deepseek-ai/dsh dist-tags）。
 #             按默认方式装宿主会装到过期版本。
@@ -39,6 +42,15 @@
 #  2. **清掉换线前的残留再装**：一棵旧线的 `package-lock.json`（或装了旧树的 node_modules）
 #     会让 `npm install` 直接 ERESOLVE，而失败之后 node_modules 停在旧版本上，后面每一步都绿。
 #     清锁清树写在 `swap` 里，本地复现与 CI 走同一条路径。
+#
+# ## 声明面是**若干个族**的并集，换版只动其中一族
+#
+#  npm 的预发布语义：候选带预发布段时，只有区间里**同一个 major.minor.patch** 也带预发布段
+#  才允许匹配。所以要同时承诺两族，单区间罩不住，必须用 `||` 显式枚举。
+#  compat-swap 的换版语义随之是「**保留旧族、只替换目标族**」（`--drop <前缀>` 显式删族）。
+#
+#  这带来一条固有代价（写在决策记录里）：宿主再推一个**新的 major.minor.patch** 的预发布时，
+#  这条并集不会自动罩住它，需要**手动加一族**再换 —— 跟多条预发布线就要付这份手动成本。
 #
 # 不挂 push：这条线看的是**上游**动没动，本地提交改不了结论。
 name: Compat
@@ -108,14 +120,32 @@ jobs:
             exit 1
           fi
 
-  # 旧线（alpha）：**只记录，不阻断 run**。
+  # 记录线：**只记录，不阻断 run**。矩阵覆盖两条我们承诺但不是承诺线的族。
   #
-  # 它已低于本仓声明的下限，换到它上面等于把依赖降到声明范围之外 —— 红是这个 job 的常态，
-  # 而不是仓库出事的信号。留着它是为了「旧线到底哪一步先坏」这份记录，
-  # 不让它把每周的失败通知打出去。真正看住的东西在 next 与 declaration 上。
+  #   alpha      —— 宿主早已停发的那条旧线（高于我们的下限，但不再是任何承诺的一部分）。
+  #   旧 RC 族 —— **声明面里承诺的第二族**（有真实使用者停在那里，见决策记录；
+  #                 实测：没有任何 dist-tag 指向它，所以这里用**版本前缀**定位族
+  #                 （compat-swap 的线参数既收 dist-tag 也收版本前缀）。
+  #
+  # 这两条红了不阻断 run（job 级 continue-on-error），但它们**必须真的跑** —— 承诺的那族是
+  # 对外承诺的一部分，不跑就等于假绿。alpha 红是常态（它不在声明面里）。
   record:
     runs-on: ubuntu-latest
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # alpha 不在声明面里（见文件头），所以它换不动 —— swap 会以「声明面里没有这一族」
+          # 明确报错停下。这本身就是一条信息：那条线已不在我们的承诺范围内。
+          - line: alpha
+            only: ''
+          # 承诺的第二族：用**版本前缀**定位（实测没有任何 dist-tag 指向它），并 `--only`
+          # 把声明面**临时收窄成只有这一族** —— 并集区间会被 npm 解析成「装匹配集里最高的那族」，
+          # 不收窄就永远装不到低族（verify 会 18 项全红）。
+          - line: 0.1.7-rc
+            only: '--only 0.1.7-rc'
+    name: record (${{ matrix.line }})
     steps:
       - uses: actions/checkout@v7
 
@@ -133,16 +163,16 @@ jobs:
       # → ERESOLVE，后面每一步全塌）。清锁清树因此写进 `swap` 自己：
       # 本地复现与 CI 走同一条路径，不指望调用方记得。
       #
-      # 换包只替换区间里的**下限版本**，运算符与上界原样保留 —— 声明面不会在 CI 里悄悄变形；
+      # 换包只替换**目标族**里的下限版本，其余族原样保留（声明面是两族并集，见脚本头部）；
       # `engines.dsh` 与依赖段同进同退，否则 redlines 的「逐字相同」每周必红。
       #
       # 这一步同时完成「装」与「核对实装版本」（`swap` 内部先跑裸 npm install，再跑 verify）：
       # 分开写会留下「只跑了前半段」的口子，而 npm install 失败时 node_modules 会停在旧版本上，
       # 让后面每一步都绿。`--ignore-scripts` 是必须的：本包的 prepare 会跑 npm run build（内含 tsc），
       # 类型面一漂移 tsc 就非零退出，install 本身失败，什么也测不到。构建由下面的步骤显式驱动。
-      - name: Swap onto the legacy alpha line, install, and confirm what got installed
+      - name: Swap onto ${{ matrix.line }}, install, and confirm what got installed
         id: verify
-        run: node scripts/compat-swap.mjs swap alpha
+        run: node scripts/compat-swap.mjs swap ${{ matrix.line }} ${{ matrix.only }}
 
       - name: Typecheck
         id: typecheck
@@ -173,7 +203,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "## DSH 兼容性 · alpha 线（已低于声明下限，只记录）"
+            echo "## DSH 兼容性 · 记录线 ${{ matrix.line }}（只记录）"
             echo ""
             echo "| 步骤 | 结果 |"
             echo "| --- | --- |"
@@ -184,10 +214,11 @@ jobs:
               echo "| 分流诊断（跳过 tsc 的类型面） | ${{ steps.diagnose.outcome }} |"
             fi
             echo ""
-            echo "**红了怎么办**：先确认这不是「本来就该红」—— 本 job 跑的那条线**低于我们对宿主的下限**，"
-            echo "红了通常只说明旧线装不出新接缝，不构成缺陷。真要看的是 next job 与 declaration job。"
-            echo ""
-            echo "（历史：2026-09-22 之前这条线是承诺线，红了必须修；角色对调后它降级为记录。）"
+            echo "**红了怎么办**：先确认这不是「本来就该红」。记录线有两种情况："
+            echo "  - **alpha**：它**不在**本仓声明面里（声明面是承诺族的并集），"
+            echo "    红了只说明旧线装不出新接缝，不构成缺陷。真要看的是 next job 与 declaration job。"
+            echo "  - **承诺的那族**：它是**声明面里承诺的一族**（有真实使用者停在那里），"
+            echo "    所以红了**要当回事** —— 那说明我们对外承诺的兼容性真的坏了，按下面的链修。"
             echo ""
             echo "**若确实要查**（顺序不可颠倒）："
             echo ""
@@ -199,7 +230,7 @@ jobs:
             echo "   - **全量测试红** → **行为差异**，最重。按 test/README.md 的分层定位："
             echo "     L3b/L6a（native-web-tools / client-bundle / dist）说明平台语义变了；L1/L2 红则先怀疑"
             echo "     换包装错了 —— 那几层对宿主版本不敏感。"
-            echo "2. 本地复现：clone 之后跑一遍 `node scripts/compat-swap.mjs swap <线>`（它自己改写声明面、清旧线残留、装、再核对）。"
+            echo "2. 本地复现：clone 之后跑一遍 `node scripts/compat-swap.mjs swap ${{ matrix.line }}`（它自己改写声明面、清旧线残留、装、再核对）。"
             echo "3. 修 → 按 docs/PUBLISHING.md 定档 → 发版 → 等下一轮。"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -209,7 +240,7 @@ jobs:
         if: always()
         run: |
           if [ "${{ steps.verify.outcome }}" != "success" ] || [ "${{ steps.typecheck.outcome }}" != "success" ] || [ "${{ steps.suite.outcome }}" != "success" ]; then
-            echo "::error::alpha 线漂移（换包=${{ steps.verify.outcome }}，类型面=${{ steps.typecheck.outcome }}，全量测试=${{ steps.suite.outcome }}）。这是**记录**不是告警：这条线已低于声明下限。处理链见本次运行的 Summary。"
+            echo "::error::${{ matrix.line }} 线漂移（换包=${{ steps.verify.outcome }}，类型面=${{ steps.typecheck.outcome }}，全量测试=${{ steps.suite.outcome }}）。这是**记录**不阻断 run；承诺的那族是对外承诺的一部分，它红要当回事。处理链见本次运行的 Summary。"
             exit 1
           fi
 
@@ -344,11 +375,13 @@ jobs:
 
           Run: ${RUN_URL}
 
-          Criterion: the declared range must cover the line we tell users to install - the committed line
-          (next), which is also the line the README sends users to for the configuration UI. A red declaration
-          means the declared range no longer reaches that line; a red next means the code no longer compiles
-          or behaves on the committed line. The alpha line runs as a record only: it sits below our declared
-          floor, so a red there is expected and is not reported here.
+          Criterion: the declared ranges must cover the lines we tell users they can install. The declared
+          surface is a union of two prerelease families because npm only matches a prerelease candidate
+          when the range carries a prerelease comparator of the same major.minor.patch.
+          A red declaration means the declared ranges no longer reach the committed line (next); a red
+          committed means the code no longer compiles or behaves on the line users are told to install.
+          The record lines (alpha, which is outside the declared surface, and the older promised family,
+          located by version prefix) run without blocking the run and are not reported here.
 
           Recovery: open the run summary, classify the failure, then widen the peer ranges, sync both READMEs,
           and ship a release - see docs/PUBLISHING.md, section "Compatibility" (兼容性). Close this issue once

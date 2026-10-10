@@ -105,7 +105,7 @@ The three sections below are each tool's full parameter set and limits. The mode
 
 ### Requirements
 
-- **DSH range**: see `engines.dsh` in [package.json](package.json) — that is the single source of truth, and it is **character-for-character identical** to all 27 `@deepseek-ai/dsh-*` entries (a mismatch means a Host without the seam this plugin needs, and a missing seam is **silent**: no configuration UI, no error). Neither this file nor [README.md](README.md) copies the value, which drifts.
+- **DSH range**: see `engines.dsh` in [package.json](package.json) — that is the single source of truth, and it is **character-for-character identical** to all 27 `@deepseek-ai/dsh-*` entries (a mismatch means a Host without the seam this plugin needs, and a missing seam is **silent**: no configuration UI, no error). It commits to **two** prerelease families of the Host (the current RC family and the still-usable older one, enumerated with `||` — npm only matches prereleases within the same `major.minor.patch`, so a single range cannot cover two families); which one you install is up to it. Neither this file nor [README.md](README.md) copies the value, which drifts.
 - Node `>= 20`
 
 Install the Host from an **explicit dist-tag**: `latest` is not trustworthy across this family (on most `@deepseek-ai/dsh-*` packages it points at a much older version), so a default install can land outside the declared range — check it live with `npm view @deepseek-ai/dsh dist-tags`.
