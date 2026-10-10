@@ -14,7 +14,8 @@
    `git rev-parse HEAD`。发布守卫判的是**远端**「上个 tag..HEAD」的区间 ——
    本地领先 11 个提交而没 push 时，远端那个区间是**空的**，守卫会正确地说「没有什么可发的」并拒发。
    注意这与第 0 条是同一类：**动作依赖什么状态，就先核那个状态**；而这一次依赖的是**远端**的，不是本地的。
-   不对就先 `git push origin main`。
+   不对就把这些提交合到 `main`：常态是**开 PR 合并**（`main` 有 `protect-main` ruleset，直推会被拒）；
+   自己是 admin 时可走 ruleset 的 **admin bypass** 直推，但既然是本仓的常态路径，优先走 PR。
 1. 档位按下方[版本号](#版本号)的问题链定：**patch / minor 由维护 agent 定档后直接发，major 必须先经人类确认**。
 2. `README.md` 与 `README_en.md` 的安装与配置说明与当前行为一致（两份必同改，见 [AGENTS.md](../AGENTS.md) 的全局规则）。
 3. `cordis.patch.yml` 里**不含**任何凭据。
@@ -266,7 +267,7 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 
 两者都校验 `package.json` 与 `package-lock.json` 的**版本号**一致：ci.yml 在每次推送就拦，release.yml 在 bump 之前再拦一次。版本号写两处，漏一处不该等到发版才发现。
 
-发版提交由 `GITHUB_TOKEN` 推送，因此不会再触发一轮 ci.yml；发布工作流自身已跑过 typecheck 与 test。
+发版提交由 `dsh-shipwright` App token 推送，提交信息带 `[skip ci]`，因此不会再触发一轮 ci.yml；发布工作流自身已跑过 typecheck 与 test。
 
 - 两份 workflow 的 action 均已升 v7：v7 移除了 dummy `NODE_AUTH_TOKEN` 兜底（`.npmrc` 引用 `${NODE_AUTH_TOKEN}`，而 `npm ci` 跑在带真 token 的 `npm publish` 之前）—— 2026-09-13 在 PR 分支用 `workflow_dispatch` 实跑验证过，无需为它退回 v4。
 - action 版本漂移交给 [dependabot.yml](../.github/dependabot.yml)（每周一个 bump PR）。**PR 上的 CI 只跑 ci.yml：动 `release.yml` 的 PR 就算绿勾也不代表发布链路验过** —— 改发布链必须手动 dispatch 实跑。
