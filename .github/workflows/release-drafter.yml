@@ -1,0 +1,25 @@
+# Maintains a draft Release: after each merge to main, appends that batch of PRs
+# (categorized by label) into a draft.
+#
+# Minimal permissions: only contents: write (create/update the draft).
+# Runner pinned to ubuntu-latest: on windows-latest the path separator makes the action
+# fail to read .github/release-drafter.yml (404), and the draft ends up empty with no error.
+name: release-drafter
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: release-drafter/release-drafter@v7
+        with:
+          disable-autolabeler: true
