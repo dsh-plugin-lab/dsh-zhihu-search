@@ -15,12 +15,12 @@
   "icon": "./icon.svg",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zlZayn/dsh-zhihu-search.git"
+    "url": "git+https://github.com/dsh-plugin-lab/dsh-zhihu-search.git"
   },
   "bugs": {
-    "url": "https://github.com/zlZayn/dsh-zhihu-search/issues"
+    "url": "https://github.com/dsh-plugin-lab/dsh-zhihu-search/issues"
   },
-  "homepage": "https://github.com/zlZayn/dsh-zhihu-search#readme",
+  "homepage": "https://github.com/dsh-plugin-lab/dsh-zhihu-search#readme",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
