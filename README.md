@@ -2,9 +2,7 @@
   <img src="icon.svg" alt="dsh-zhihu-search" width="80" height="80">
 </p>
 
-<p align="center">
-  <h1 align="center">dsh-zhihu-search</h1>
-</p>
+<h1 align="center">dsh-zhihu-search</h1>
 
 <p align="center">
   <img src="assets/banner.svg" alt="dsh-zhihu-search：给 DSH 装上知乎搜索" width="600">
@@ -55,7 +53,7 @@
 | `zhihu_global_search` | 知乎全网索引搜索，可按域名和时间过滤；结果会混入知乎站内内容 | 查找特定网站上的公开资料 |
 | `zhihu_zhida` | 知乎直答，成体系的综合性回答 | 需要「先检索再总结」的复杂中文问题 |
 
-下面三个小节是每个工具的完整参数与能力边界。模型只看到下表中的语义化参数——知乎原生的字符串查询语法由插件内部编译，模型接触不到，也就不可能写错。
+下面三个小节是每个工具的完整参数与能力边界。模型只看到下表中的语义化参数，看不到知乎的原始查询语法。
 
 ### `zhihu_search` —— 站内检索
 
@@ -105,7 +103,7 @@
 
 ### 前置
 
-- **DSH 的区间见 [package.json](package.json) 的 `engines.dsh`** —— 那是唯一真源，它与全部 27 条 `@deepseek-ai/dsh-*` 声明**逐字相同**（不同形状时使用者装到的宿主可能缺接缝，而接缝缺席是**静默**的：配置界面不出现、宿主不报错）。它同时承诺**两族**宿主预发布（新 RC 族与仍可用的旧 RC 族，用 `||` 显式枚举 —— npm 只在同一 `major.minor.patch` 的预发布之间匹配，单区间罩不住两族），装哪一族由它说了算。本文件与 [README_en.md](README_en.md) 都不抄那个会漂的值。
+- **DSH 的区间见 [package.json](package.json) 的 `engines.dsh`** —— 那是唯一真源，它与全部 `@deepseek-ai/dsh-*` 声明**逐字相同**（不同形状时使用者装到的宿主可能缺接缝，而接缝缺席是**静默**的：配置界面不出现、宿主不报错）。声明面同时承诺了不止一族宿主版本，装哪一族由它说了算。本文件与 [README_en.md](README_en.md) 都不抄那个会漂的值。
 - Node `>= 20`
 
 装宿主时**要显式指定版本线**：本家族的 `latest` 标签不可靠（多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本），按默认方式装可能落在声明范围之外 —— 现查 `npm view @deepseek-ai/dsh dist-tags`。
@@ -115,6 +113,14 @@ npm install -g @deepseek-ai/dsh@next    # 本插件承诺支持的线
 ```
 
 兼容性不是推断出来的：每周由 [compat.yml](.github/workflows/compat.yml) 对 `next`（承诺线）与 `alpha`（**已低于我们声明的下限，只作记录**）两条线换包实跑一遍现有测试。当前结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
+
+### 从 npm 安装
+
+```bash
+dsh plugin --profile web add dsh-zhihu-search
+```
+
+`dsh plugin` 会把本包装进 profile 并挂进 `dsh.profile.bundles`。重启 `dsh --profile web` 后生效。
 
 ### 从源码安装
 
@@ -126,16 +132,10 @@ npm install && npm run build
 dsh plugin --profile web add "$PWD"
 ```
 
-`dsh plugin` 会把本包装进 profile 并挂进 `dsh.profile.bundles`。重启 `dsh --profile web` 后生效。
+同样重启 `dsh --profile web` 生效。
 
 ⚠️ 上面那步 `npm install` 不能省：`link:` 装法下依赖由仓库自己提供（见 [AGENTS.md](AGENTS.md)），
 漏装则插件显示「未运行」（`ERR_MODULE_NOT_FOUND`）。
-
-### 从 npm 安装
-
-```bash
-dsh plugin --profile web add dsh-zhihu-search
-```
 
 ### 发现与安装
 
@@ -146,10 +146,10 @@ dsh plugin --profile web add dsh-zhihu-search
 
 ## 版本兼容
 
-配置界面注册在宿主插件页的 `plugins.bundle.config` 槽上，分派 `key` 是**本插件的包名**（[package.json](package.json) 的 `name`）。这个槽**不把表单递给页面**，所以卡片自己向 `ctx.configForms.get(<loader entry id>)` 取 —— `configForms` 是 0.1.7 才有的客户端服务，接缝因此要求宿主的设置接缝达到 `engines.dsh` 声明的**下限版本**；那份声明是唯一事实来源，本文件不抄版本号。
+配置界面注册在宿主插件页的 `plugins.bundle.config` 槽上，分派 `key` 是**本插件的包名**（[package.json](package.json) 的 `name`）。这个槽**不把表单递给页面**，所以卡片自己向 `ctx.configForms.get(<loader entry id>)` 取 —— `configForms` 是这个接缝依赖的客户端服务，接缝因此要求宿主的设置接缝达到 `engines.dsh` 声明的**下限版本**；那份声明是唯一事实来源，本文件不抄版本号。
 
-- **宿主够新**：插件页 →「已安装（Installed）」组 → **点「知乎检索」进它的详情页**（标题来自 [locale/zh.json](locale/zh.json)，中文界面下的显示名；技术名 `dsh-zhihu-search` 仍在标题下方），配置区就内联在描述与「包含的组件」之间 —— **没有多一次 Configure**，密钥与开关都在那里改。
-- **宿主更早（没有 `configForms`）**：三个工具照常工作，插件页里**不会出现配置入口** —— 静默，不报错。这就是分水岭；浏览器控制台会留一条 WARN 级英文提示说明这件事。
+- **宿主够新**：插件页 →「已安装（Installed）」组 → **点「知乎检索」进它的详情页**（标题来自 [locale/zh.json](locale/zh.json)，中文界面下的显示名；技术名 `dsh-zhihu-search` 仍在标题下方），配置区就在描述下面，直接可改 —— **没有多一次 Configure**，密钥与开关都在那里改。
+- **宿主更早（没有 `configForms`）**：三个工具照常工作，插件页里**不会出现配置入口** —— 静默，不报错。这就是分水岭。
 - **需要就地配置**：把宿主升到 `engines.dsh` 声明的那条线或更高 —— 承诺线就是 `next`，装法 `npm install -g @deepseek-ai/dsh@next`；哪条线指向哪个版本现查 `npm view @deepseek-ai/dsh dist-tags`。
 
 宿主版本线怎么装见[安装 → 前置](#前置)；每周的实测结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
