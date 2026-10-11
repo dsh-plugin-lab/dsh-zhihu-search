@@ -53,3 +53,22 @@ jobs:
       # `npx prettier --check .` 此前只在本地手动跑。
       - name: Format check
         run: npm run format:check
+  # 收口 job —— ruleset 的 required_status_checks 只配这一个名字（CI Success），
+  # 本仓内部 job 增删时规则集无需改动。改本 job 前必读三条：
+  #   1. 判定只放 step 级：放 job 级时条件为假会让本 job 变 skipped，
+  #      而 GitHub 把 skipped 当 Success —— 那正好是我们要防的假绿。
+  #   2. needs 必须列全本文件所有 job id；漏一个，那个 job 红了也照样放行。
+  #   3. skipped 一并判红：本 workflow 没有合法的 if: 跳过，出现 skipped
+  #      只可能是上游失败级联（上游同在 needs 里，会同时判红）。
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: always()
+    steps:
+      - name: Verify all jobs succeeded
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: |
+          echo "::error::有 job 未成功 —— CI Success 判红（原因见本 job 上方注释）"
+          echo '${{ toJSON(needs) }}'
+          exit 1
