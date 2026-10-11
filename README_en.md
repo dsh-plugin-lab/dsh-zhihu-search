@@ -2,9 +2,7 @@
   <img src="icon.svg" alt="dsh-zhihu-search" width="80" height="80">
 </p>
 
-<p align="center">
-  <h1 align="center">dsh-zhihu-search</h1>
-</p>
+<h1 align="center">dsh-zhihu-search</h1>
 
 <p align="center">
   <img src="assets/banner.svg" alt="dsh-zhihu-search: Equipping DSH with Zhihu search" width="600">
@@ -55,7 +53,7 @@ Installing adds three tools to the model:
 | `zhihu_global_search` | Searches Zhihu's global web index; the results mix in some Zhihu content | Finding material on a specific site |
 | `zhihu_zhida` | Zhihu Zhida: a synthesized answer that pulls a topic together | Complex Chinese questions that need "retrieve, then summarize" |
 
-The three sections below are each tool's full parameter set and limits. The model only ever sees the semantic parameters in these tables — Zhihu's native string query syntax is compiled inside the plugin, so the model cannot get it wrong.
+The three sections below are each tool's full parameter set and limits. The model only ever sees the semantic parameters in these tables; it never sees Zhihu's native query syntax.
 
 ### `zhihu_search` — in-site search
 
@@ -105,7 +103,7 @@ The three sections below are each tool's full parameter set and limits. The mode
 
 ### Requirements
 
-- **DSH range**: see `engines.dsh` in [package.json](package.json) — that is the single source of truth, and it is **character-for-character identical** to all 27 `@deepseek-ai/dsh-*` entries (a mismatch means a Host without the seam this plugin needs, and a missing seam is **silent**: no configuration UI, no error). It commits to **two** prerelease families of the Host (the current RC family and the still-usable older one, enumerated with `||` — npm only matches prereleases within the same `major.minor.patch`, so a single range cannot cover two families); which one you install is up to it. Neither this file nor [README.md](README.md) copies the value, which drifts.
+- **DSH range**: see `engines.dsh` in [package.json](package.json) — that is the single source of truth, and it is **character-for-character identical** to every `@deepseek-ai/dsh-*` entry (a mismatch means a Host without the seam this plugin needs, and a missing seam is **silent**: no configuration UI, no error). The declared surface commits to more than one Host family; which one you install is up to it. Neither this file nor [README.md](README.md) copies the value, which drifts.
 - Node `>= 20`
 
 Install the Host from an **explicit dist-tag**: `latest` is not trustworthy across this family (on most `@deepseek-ai/dsh-*` packages it points at a much older version), so a default install can land outside the declared range — check it live with `npm view @deepseek-ai/dsh dist-tags`.
@@ -115,6 +113,14 @@ npm install -g @deepseek-ai/dsh@next    # the line this plugin commits to
 ```
 
 Compatibility is measured, not inferred: [compat.yml](.github/workflows/compat.yml) swaps the DSH packages onto the `next` line (the committed one) and the `alpha` line (now **below our declared floor**, kept as a record only) every week, and runs the existing suite. Current results and what to do when a line breaks: [docs/PUBLISHING.md](docs/PUBLISHING.md).
+
+### From npm
+
+```bash
+dsh plugin --profile web add dsh-zhihu-search
+```
+
+`dsh plugin` installs the package into the profile and lists it in `dsh.profile.bundles`. Restart `dsh --profile web` to pick it up.
 
 ### From source
 
@@ -126,17 +132,11 @@ npm install && npm run build
 dsh plugin --profile web add "$PWD"
 ```
 
-`dsh plugin` installs the package into the profile and lists it in `dsh.profile.bundles`. Restart `dsh --profile web` to pick it up.
+The same restart applies.
 
 ⚠️ The `npm install` above is not optional: under the `link:` form the repository supplies its
 own dependencies (see [AGENTS.md](AGENTS.md)) — skip it and the plugin shows as "not running"
 (`ERR_MODULE_NOT_FOUND`).
-
-### From npm
-
-```bash
-dsh plugin --profile web add dsh-zhihu-search
-```
 
 ### Discovery and install
 
@@ -147,10 +147,10 @@ The repository carries the GitHub topic [`dsh-plugin`](https://github.com/topics
 
 ## Version compatibility
 
-The configuration UI registers into the Host's `plugins.bundle.config` slot, and its dispatch `key` is this plugin's **package name** (the `name` in [package.json](package.json)). That slot does **not** hand the page a form, so the card fetches it itself from `ctx.configForms.get(<loader entry id>)` — `configForms` is a client service that arrived in 0.1.7, which is why the seam requires a Host at or above the **lower bound** declared by `engines.dsh`; that declaration is the single source of truth, and this document does not copy version numbers.
+The configuration UI registers into the Host's `plugins.bundle.config` slot, and its dispatch `key` is this plugin's **package name** (the `name` in [package.json](package.json)). That slot does **not** hand the page a form, so the card fetches it itself from `ctx.configForms.get(<loader entry id>)` — `configForms` is the client service this seam depends on, which is why the seam requires a Host at or above the **lower bound** declared by `engines.dsh`; that declaration is the single source of truth, and this document does not copy version numbers.
 
-- **Host is new enough**: **Plugins → Installed → click "Zhihu Search"** to open its details page (that title comes from [locale/en.json](locale/en.json), the name shown on an English UI; the technical name `dsh-zhihu-search` stays right below it) — the configuration section sits inline between the description and the components list, with **no extra Configure step**. Both the key and the switch are edited there.
-- **Earlier Host (no `configForms`)**: the three tools keep working, and the Plugins page simply **shows no configuration entry** — silently, with no error. That is the watershed; the browser console keeps one WARN-level English note about it.
+- **Host is new enough**: **Plugins → Installed → click "Zhihu Search"** to open its details page (that title comes from [locale/en.json](locale/en.json), the name shown on an English UI; the technical name `dsh-zhihu-search` stays right below it) — the configuration section sits right below the description, ready to edit, with **no extra Configure step**. Both the key and the switch are edited there.
+- **Earlier Host (no `configForms`)**: the three tools keep working, and the Plugins page simply **shows no configuration entry** — silently, with no error. That is the watershed.
 - **Want in-place configuration**: upgrade the Host to the line declared by `engines.dsh` or newer — the committed line is `next`, so install it with `npm install -g @deepseek-ai/dsh@next`; which line points at which version is one command away: `npm view @deepseek-ai/dsh dist-tags`.
 
 How to install the Host from the right line: [Install → Requirements](#requirements). Weekly measurements and what to do when a line breaks: [docs/PUBLISHING.md](docs/PUBLISHING.md).
