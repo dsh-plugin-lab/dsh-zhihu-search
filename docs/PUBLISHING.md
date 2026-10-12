@@ -171,7 +171,7 @@ npm view dsh-zhihu-search dist-tags                           # alpha = 新号�
 - `lib/**/*.map` 被排除：这些 source map 指向未随包的 `src/`，对使用者是悬空的，却占了三分之一体积。tsconfig 仍生成它们，本地调试照常。
 - `README_en.md` 必须随包：`README.md` 顶部链接指向它，不随包就是 npm 页面上的死链。
 - `scripts/` 与 `src/` 不发布，因此 `npm run build` 必须在打包前跑过，`lib/` 是唯一交付物。
-- `assets/` **不必**进包：npm 页面会把 README 里的相对图片路径改写到默认分支的 raw 地址（实测形态：`raw.githubusercontent.com/zlZayn/dsh-zhihu-search/HEAD/<仓库相对路径>`，按仓库里的原始尺寸渲染）。代价是**所有已发布版本的页面都跟着 `main` 上的图走** —— 换图或删图等于同时改历史版本的展示。
+- `assets/` **不必**进包：npm 页面会把 README 里的相对图片路径改写到默认分支的 raw 地址（实测形态：`raw.githubusercontent.com/dsh-plugin-lab/dsh-zhihu-search/HEAD/<仓库相对路径>`，按仓库里的原始尺寸渲染）。代价是**所有已发布版本的页面都跟着 `main` 上的图走** —— 换图或删图等于同时改历史版本的展示。
 
 校验：
 
@@ -302,7 +302,7 @@ DSH 至今全是 prerelease，版本号本身不构成承诺，tag 才是。三�
 
 **2026-09-24 承诺线迁回 `next`**：宿主把新线（rc 档）发在 `next` 上、`alpha` 停在旧档（具体值现查 `npm view @deepseek-ai/dsh dist-tags`；区间形状看 `package.json` 的 `engines.dsh` —— 承诺线是**推荐**线，声明面是**安装前提**，两者可以不一致），本仓推荐的配置界面下限已跟着迁到那条线，承诺线因此落在 `next`。**2026-09-22 那次对调**（此前 next 承诺、alpha 前瞻）理由不是口味：本仓的配置接缝只存在于 alpha 线上 —— 接缝换代之前 `next` 线上没有 `configForms` 那套配置面（卡片因此拿不到表单），声明面只能跟着 alpha 走。而一条**长期必红**的周更任务会让「红 = 出事」这个信号失效，所以判断哪条线是承诺线，判据是「声明面落在哪」，不是历史习惯。
 
-**2026-10-10 下限抬到 RC 线起点**：承诺线 2026-09-24 就迁到 `next` 了，但下界一直停在 alpha 线那一段上，而 npm 的预发布语义让它**永远罩不住** `next` 上的版本（候选带预发布段时，只有区间里同一个 `major.minor.patch` 也带预发布段才允许匹配 —— 两段写在不同补丁位上就永远对不上）—— 于是 `declaration` 作业自迁线起**每周必红**（issue [#2](https://github.com/zlZayn/dsh-zhihu-search/issues/2) 就是它）。修法是把整条声明面的下界抬到那条线的起点，与姊妹仓 `dsh-ds-balance` 换线时的做法同型。同一条语义的固有代价：**宿主再往前推一个补丁位的预发布时，这条下界会再次罩不住**，届时要再抬一次 —— 这不是形状选错，是「跟预发布线」这件事本身的代价。
+**2026-10-10 下限抬到 RC 线起点**：承诺线 2026-09-24 就迁到 `next` 了，但下界一直停在 alpha 线那一段上，而 npm 的预发布语义让它**永远罩不住** `next` 上的版本（候选带预发布段时，只有区间里同一个 `major.minor.patch` 也带预发布段才允许匹配 —— 两段写在不同补丁位上就永远对不上）—— 于是 `declaration` 作业自迁线起**每周必红**（issue [#2](https://github.com/dsh-plugin-lab/dsh-zhihu-search/issues/2) 就是它）。修法是把整条声明面的下界抬到那条线的起点，与姊妹仓 `dsh-ds-balance` 换线时的做法同型。同一条语义的固有代价：**宿主再往前推一个补丁位的预发布时，这条下界会再次罩不住**，届时要再抬一次 —— 这不是形状选错，是「跟预发布线」这件事本身的代价。
 
 `latest` 为什么不可用：多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本，`@deepseek-ai/dsh` 自己那条也未必落在本插件的声明区间里 —— 逐包对照现查 `node scripts/check-declaration.mjs --line latest`（那个脚本收任意 dist-tag），宿主自己那条线现查 `npm view @deepseek-ai/dsh dist-tags`。按默认方式装宿主的人会落在声明范围之外，所以 [README](../README.md) 的前置版本必须写明装哪条线。
 
