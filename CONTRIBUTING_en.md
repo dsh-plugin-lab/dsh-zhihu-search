@@ -2,7 +2,7 @@
 
 # Contributing — Getting involved with dsh-zhihu-search
 
-Issues and PRs are filed on [GitHub](https://github.com/zlZayn/dsh-zhihu-search).
+Issues and PRs are filed on [GitHub](https://github.com/dsh-plugin-lab/dsh-zhihu-search).
 
 ## When filing a bug
 

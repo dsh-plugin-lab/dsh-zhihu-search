@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml"><img src="https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://github.com/dsh-plugin-lab/dsh-zhihu-search/actions/workflows/ci.yml"><img src="https://github.com/dsh-plugin-lab/dsh-zhihu-search/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://www.npmjs.com/package/dsh-zhihu-search"><img src="https://img.shields.io/npm/v/dsh-zhihu-search.svg" alt="npm"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
     <a href="https://www.npmjs.com/package/dsh-zhihu-search"><img src="https://img.shields.io/badge/SLSA-Build%20L2-green?logo=slsa" alt="SLSA Build L2"></a>
@@ -125,7 +125,7 @@ dsh plugin --profile web add dsh-zhihu-search
 ### From source
 
 ```bash
-git clone https://github.com/zlZayn/dsh-zhihu-search.git
+git clone https://github.com/dsh-plugin-lab/dsh-zhihu-search.git
 cd dsh-zhihu-search
 npm install && npm run build
 
@@ -141,7 +141,7 @@ own dependencies (see [AGENTS.md](AGENTS.md)) — skip it and the plugin shows a
 ### Discovery and install
 
 - **npm**: [`dsh-zhihu-search`](https://www.npmjs.com/package/dsh-zhihu-search)
-- **GitHub**: [`zlZayn/dsh-zhihu-search`](https://github.com/zlZayn/dsh-zhihu-search)
+- **GitHub**: [`dsh-plugin-lab/dsh-zhihu-search`](https://github.com/dsh-plugin-lab/dsh-zhihu-search)
 
 The repository carries the GitHub topic [`dsh-plugin`](https://github.com/topics/dsh-plugin), which is how plugin marketplaces discover plugins.
 

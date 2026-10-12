@@ -2,7 +2,7 @@
 
 # Contributing — 参与 dsh-zhihu-search
 
-issue 与 PR 提交至 [GitHub](https://github.com/zlZayn/dsh-zhihu-search)。
+issue 与 PR 提交至 [GitHub](https://github.com/dsh-plugin-lab/dsh-zhihu-search)。
 
 ## 报 bug 时附上
 

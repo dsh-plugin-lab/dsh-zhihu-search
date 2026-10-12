@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml"><img src="https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://github.com/dsh-plugin-lab/dsh-zhihu-search/actions/workflows/ci.yml"><img src="https://github.com/dsh-plugin-lab/dsh-zhihu-search/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://www.npmjs.com/package/dsh-zhihu-search"><img src="https://img.shields.io/npm/v/dsh-zhihu-search.svg" alt="npm"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT 许可证"></a>
     <a href="https://www.npmjs.com/package/dsh-zhihu-search"><img src="https://img.shields.io/badge/SLSA-Build%20L2-green?logo=slsa" alt="SLSA Build L2"></a>
@@ -125,7 +125,7 @@ dsh plugin --profile web add dsh-zhihu-search
 ### 从源码安装
 
 ```bash
-git clone https://github.com/zlZayn/dsh-zhihu-search.git
+git clone https://github.com/dsh-plugin-lab/dsh-zhihu-search.git
 cd dsh-zhihu-search
 npm install && npm run build
 
@@ -140,7 +140,7 @@ dsh plugin --profile web add "$PWD"
 ### 发现与安装
 
 - **npm**：[`dsh-zhihu-search`](https://www.npmjs.com/package/dsh-zhihu-search)
-- **GitHub**：[`zlZayn/dsh-zhihu-search`](https://github.com/zlZayn/dsh-zhihu-search)
+- **GitHub**：[`dsh-plugin-lab/dsh-zhihu-search`](https://github.com/dsh-plugin-lab/dsh-zhihu-search)
 
 仓库带有 GitHub topic [`dsh-plugin`](https://github.com/topics/dsh-plugin)，插件市场据此自动发现插件。
 

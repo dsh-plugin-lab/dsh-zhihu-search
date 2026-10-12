@@ -223,7 +223,7 @@ npm view dsh-zhihu-search@<版本> dist.shasum   # 与上面那个 tarball 的 S
 
 一次性配置（npmjs.com → 包 → Settings → Trusted Publisher → GitHub Actions）：
 
-- **Organization or user**：`zlZayn` —— 填 **GitHub 属主**，不是 npm 用户名。
+- **Organization or user**：`dsh-plugin-lab` —— 填 **GitHub 属主**，不是 npm 用户名。
 - **Repository**：`dsh-zhihu-search`；**Workflow filename**：`release.yml`（只填文件名，不含路径）。
 - **Environment name**：连接上显示的环境名（当前 `github-release`）**必须与 job 的 `environment:` 逐字一致**。
 - **Allowed actions**：必须显式勾上 `npm publish` —— 2026-09-03 之后新建的连接默认只给 `npm stage publish`。
