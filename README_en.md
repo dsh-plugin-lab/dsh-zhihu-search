@@ -151,7 +151,7 @@ The configuration UI registers into the Host's `plugins.bundle.config` slot, and
 
 - **Host is new enough**: **Plugins → Installed → click "Zhihu Search"** to open its details page (that title comes from [locale/en.json](locale/en.json), the name shown on an English UI; the technical name `dsh-zhihu-search` stays right below it) — the configuration section sits right below the description, ready to edit, with **no extra Configure step**. Both the key and the switch are edited there.
 - **Earlier Host (no `configForms`)**: the three tools keep working, and the Plugins page simply **shows no configuration entry** — silently, with no error. That is the watershed.
-- **Want in-place configuration**: upgrade the Host to the line declared by `engines.dsh` or newer — the committed line is `next`, so install it with `npm install -g @deepseek-ai/dsh@next`; which line points at which version is one command away: `npm view @deepseek-ai/dsh dist-tags`.
+- **Want in-place configuration**: install the Host on a line the `engines.dsh` range **covers** — that range carries both ends and is the single source of truth (a line past its ceiling is outside the declaration); the committed line is `next`, so install it with `npm install -g @deepseek-ai/dsh@next`; which line points at which version is one command away: `npm view @deepseek-ai/dsh dist-tags`.
 
 How to install the Host from the right line: [Install → Requirements](#requirements). Weekly measurements and what to do when a line breaks: [docs/PUBLISHING.md](docs/PUBLISHING.md).
 

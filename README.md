@@ -150,7 +150,7 @@ dsh plugin --profile web add "$PWD"
 
 - **宿主够新**：插件页 →「已安装（Installed）」组 → **点「知乎检索」进它的详情页**（标题来自 [locale/zh.json](locale/zh.json)，中文界面下的显示名；技术名 `dsh-zhihu-search` 仍在标题下方），配置区就在描述下面，直接可改 —— **没有多一次 Configure**，密钥与开关都在那里改。
 - **宿主更早（没有 `configForms`）**：三个工具照常工作，插件页里**不会出现配置入口** —— 静默，不报错。这就是分水岭。
-- **需要就地配置**：把宿主升到 `engines.dsh` 声明的那条线或更高 —— 承诺线就是 `next`，装法 `npm install -g @deepseek-ai/dsh@next`；哪条线指向哪个版本现查 `npm view @deepseek-ai/dsh dist-tags`。
+- **需要就地配置**：把宿主升到 `engines.dsh` 声明**覆盖**的那条线 —— 那个范围带上下限、是唯一真源（上限之外的线不在声明范围内）；承诺线就是 `next`，装法 `npm install -g @deepseek-ai/dsh@next`；哪条线指向哪个版本现查 `npm view @deepseek-ai/dsh dist-tags`。
 
 宿主版本线怎么装见[安装 → 前置](#前置)；每周的实测结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
 
