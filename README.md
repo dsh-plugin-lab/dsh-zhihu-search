@@ -25,6 +25,10 @@
   </p>
 
   <p>
+    各版本改动 → <a href="https://github.com/dsh-plugin-lab/dsh-zhihu-search/releases">Releases</a>（与 npm 版本一一对应）
+  </p>
+
+  <p>
     <strong><a href="README.md">简体中文</a></strong> · <a href="README_en.md">English</a>
   </p>
 </div>
