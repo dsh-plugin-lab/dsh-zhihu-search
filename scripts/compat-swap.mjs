@@ -487,9 +487,13 @@ function applyPlan(manifest, plan, hostVersion, dropPrefix, onlyPrefix) {
  * @returns {void}
  */
 function clearStaleLine() {
-  if (existsSync('package-lock.json')) {
-    rmSync('package-lock.json');
-    console.log('已删 package-lock.json（它记着换线前的解析，留着会 ERESOLVE）。');
+  // 两种锁文件都清：npm 仓只有前者，pnpm 仓只有后者。留着旧锁 = 换线后直接 ERESOLVE，
+  // 而装失败之后 node_modules 停在旧版本上，后面每一步都绿（假绿）。
+  for (const lock of ['package-lock.json', 'pnpm-lock.yaml']) {
+    if (existsSync(lock)) {
+      rmSync(lock);
+      console.log(`已删 ${lock}（它记着换线前的解析，留着会 ERESOLVE）。`);
+    }
   }
   if (existsSync('node_modules')) {
     rmSync('node_modules', { recursive: true, force: true });
