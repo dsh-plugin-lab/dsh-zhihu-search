@@ -2,8 +2,8 @@
 
 ## 状态
 
-- 已发布版本以 [package.json](package.json) 的 `version` 为准 → <https://github.com/dsh-plugin-lab/dsh-zhihu-search>
-- npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 手动触发：**只发 `package.json` 里那个号**，不 bump；版本号是发布前的本地一步，见「常用命令」的发版两步）
+- 已发布版本以 [package.json](package.json) 的 `version` 为准 → [仓库首页](https://github.com/dsh-plugin-lab/dsh-zhihu-search)
+- npm → [npm 包页](https://www.npmjs.com/package/dsh-zhihu-search)（由 [release.yml](.github/workflows/release.yml) 手动触发：**只发 `package.json` 里那个号**，不 bump；版本号是发布前的本地一步，见「常用命令」的发版两步）
 - 功能、插件页配置卡片与本地真机验证全部完成；工具清单见 [README.md](README.md)。
 - 市场收录：仓库已带 `dsh-plugin` topic；`awesome-dsh-plugin` 的 [PR #5037](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/5037) 已提，等评审 → [笔记](.agents/notes/2026-09-12-marketplace-submission.md)
 
