@@ -274,10 +274,13 @@ jobs:
       # 分开写会留下「只跑了前半段」的口子，而 npm install 失败时 node_modules 会停在旧版本上，
       # 让后面每一步都绿。`--ignore-scripts` 是必须的：本包的 prepare 会跑 npm run build（内含 tsc），
       # 类型面一漂移 tsc 就非零退出，install 本身失败，什么也测不到。构建由下面的步骤显式驱动。
+      # `--only 0.2.0` **不能省**（2026-10-12 实测）：并集区间下，安装器会在 `latest` 指向的
+      # 版本能满足区间时优先用它，于是不收窄就会装出**混合树**，后面几步跑的不是承诺线那条族，
+      # 而 `verify` 的红来自解析规则、不是宿主不兼容。姊妹仓 dsh-workbuddy-bridge 首跑即此。
       - name: Swap onto the next line, install, and confirm what got installed
         id: verify
         continue-on-error: true
-        run: node scripts/compat-swap.mjs swap next
+        run: node scripts/compat-swap.mjs swap next --only 0.2.0
 
       - name: Typecheck
         id: typecheck
