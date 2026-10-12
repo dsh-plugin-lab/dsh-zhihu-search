@@ -137,7 +137,6 @@
 
 ## 文档地图
 
-- 外部贡献入口 → [CONTRIBUTING.md](CONTRIBUTING.md)（双语，另一份是 [CONTRIBUTING_en.md](CONTRIBUTING_en.md)）
 - 架构设计 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 发布流程 → [docs/PUBLISHING.md](docs/PUBLISHING.md)
 - 事故复盘 → [docs/postmortem/](docs/postmortem/)

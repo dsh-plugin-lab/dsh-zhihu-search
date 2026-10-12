@@ -217,7 +217,7 @@ The card's "Hide native web search (web_search / web_fetch)" switch is off by de
 
 ## Contributing
 
-External entry point (what a bug report needs, what to read before proposing a feature, what to do before opening a PR) → [CONTRIBUTING_en.md](CONTRIBUTING_en.md).
+Bugs and requests go to the repository Issues.
 
 Design stance: tool parameters and result text are an **API for the model** first and documentation for humans second — the writing rules live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) under "Tool description conventions" and "Honesty of model-visible text".
 
