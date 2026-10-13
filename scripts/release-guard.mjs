@@ -22,7 +22,7 @@ const NON_ARTIFACT_SCRIPTS = new Set([
   'scripts/release-guard.mjs',
   'scripts/compat-swap.mjs',
 ]);
-const NON_ARTIFACT_FILES = new Set(['LICENSE', '.gitignore', '.gitattributes']);
+const NON_ARTIFACT_FILES = new Set(['LICENSE', '.gitignore', '.gitattributes', 'screenshots.json']);
 
 /**
  * 判断一个路径是否**不**改变已发布产物。
