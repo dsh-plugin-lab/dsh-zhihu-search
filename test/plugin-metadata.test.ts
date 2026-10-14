@@ -11,7 +11,7 @@
  * - 字段缺失、空白或 JSON 写坏 → 只回落到下一档（`package.json.name` → 完整 Cordis 名）。
  *
  * 判定本身住在 [scripts/plugin-metadata.mjs](../scripts/plugin-metadata.mjs)，
- * `npm run check:release` 读**同一份**（避免守卫与测试各写一套判定，红了只红一边）。
+ * `pnpm run check:release` 读**同一份**（避免守卫与测试各写一套判定，红了只红一边）。
  * 机制与回落链的出处：DSH `docs/cookbook/adding-a-package.md` 的
  * 「5. Add optional plugin display metadata」、`packages/boot/app-boot/src/package-meta.ts`。
  * 为什么这么定、为什么不加图标 → [决策记录](../.agents/notes/2026-09-22-plugin-display-metadata.md)。

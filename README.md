@@ -131,7 +131,7 @@ dsh plugin --profile web add dsh-zhihu-search
 ```bash
 git clone https://github.com/dsh-plugin-lab/dsh-zhihu-search.git
 cd dsh-zhihu-search
-npm install && npm run build
+pnpm install && pnpm run build
 
 dsh plugin --profile web add "$PWD"
 ```

@@ -6,7 +6,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createZhihuGlobalSearchTool } from '../src/tools/global-search.js';
@@ -176,22 +176,46 @@ describe('类型检查开关', () => {
   });
 });
 
-describe('锁文件：resolved 必须指向官方源', () => {
-  it('package-lock.json 里没有镜像源', () => {
-    // 镜像生成的锁文件会让 CI 去镜像取包（供应链隐患），也可能因镜像未同步而让 npm ci 失败。
+describe('锁文件：必须指向官方源', () => {
+  it('pnpm-lock.yaml 里没有镜像源', () => {
+    // 镜像生成的锁文件会让 CI 去镜像取包（供应链隐患），也可能因镜像未同步而让安装失败。
     // 这条此前只写在 docs/PUBLISHING.md 的前置条件里（散文）—— 规则住在文字里就没人执行，
     // 所以 2026-09-20 落成断言。
-    const lock = JSON.parse(
-      readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'),
-    ) as {
-      packages?: Record<string, { resolved?: string }>;
-    };
-    const offenders = Object.entries(lock.packages ?? {})
-      // 只看 http(s) 来源；file:/link:/git 之类本就不是包的公开源。
-      .filter(([, meta]) => meta.resolved?.startsWith('http'))
-      .filter(([, meta]) => !meta.resolved!.startsWith('https://registry.npmjs.org/'))
-      .map(([name, meta]) => `${name || '(root)'} → ${new URL(meta.resolved!).host}`);
-    expect(offenders, `这些包的 resolved 不指向官方源：\n${offenders.join('\n')}`).toEqual([]);
+    //
+    // 迁到 pnpm 之后判据的**形状变了但口径没变**：pnpm-lock 把 tarball 的完整性摘要放在
+    // `resolution: {integrity: …}`，不再有 `resolved: <url>` 这一层。所以这里查的是**文件里
+    // 出现的每一个 http(s) URL**：pnpm 锁定的是 integrity 而非来源地址，因此只要出现地址就该是
+    // 官方源，出现别处就是有人在镜像上生成过这个锁文件。
+    const lock = readFileSync(new URL('../pnpm-lock.yaml', import.meta.url), 'utf8');
+    const hosts = [
+      ...new Set(
+        [...lock.matchAll(/https?:\/\/[^\s'"<>\\)\]]+/g)].map((match) => {
+          try {
+            return new URL(match[0]).host;
+          } catch {
+            return match[0];
+          }
+        }),
+      ),
+    ].filter((host) => !host.startsWith('registry.npmjs.org'));
+    expect(hosts, `锁文件里出现了非官方源的地址：\n${hosts.join('\n')}`).toEqual([]);
+  });
+
+  it('pnpm-lock.yaml 是唯一的锁文件', () => {
+    // 跨仓判据：全族只有 pnpm 一条路。两份锁文件同时存在时，CI 装的那棵与本机装的那棵可以不是同一棵，
+    // 而「装出来能跑」不会报错 —— 那正是要在这里拦的情况。
+    //
+    // ⚠️ 这里刻意**拼出**那个名字而不是写字面量：本文件刚被一次批量改名扫过，写字面量的话这条断言
+    // 会被改成「pnpm-lock.yaml 不该存在」而永远红 —— 一个自我否定的守卫比没有守卫更坏。
+    const npmLock = ['package', 'lock.json'].join('-');
+    expect(
+      existsSync(new URL(`../${npmLock}`, import.meta.url)),
+      `${npmLock} 与 pnpm-lock.yaml 不能共存`,
+    ).toBe(false);
+    expect(
+      existsSync(new URL('../pnpm-lock.yaml', import.meta.url)),
+      'pnpm-lock.yaml 必须入库',
+    ).toBe(true);
   });
 });
 

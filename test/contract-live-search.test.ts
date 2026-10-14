@@ -5,7 +5,7 @@
  * 每条都来自 2026-09-14 的原始探针实测，红了通常意味着上游改了行为，而不是我们写错了。
  *
  * ⚠ 会花真实配额，因此**不进日常 CI**；跑法见 [README.md](README.md) 与
- * `npm run test:contract`。
+ * `pnpm run test:contract`。
  */
 
 import { describe, expect, it } from 'vitest';

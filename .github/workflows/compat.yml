@@ -39,8 +39,8 @@
 #  1. **声明面整条同进同退**：`engines.dsh` 既不在依赖段里、名字也不带 `dsh-` 尾巴，
 #     所以换包脚本单独处理它；只换依赖段会让 redlines 的「逐字相同」**每周必红**，
 #     而那一条亮的恰好是能盖住真正不兼容点的位置。
-#  2. **清掉换线前的残留再装**：一棵旧线的 `package-lock.json`（或装了旧树的 node_modules）
-#     会让 `npm install` 直接 ERESOLVE，而失败之后 node_modules 停在旧版本上，后面每一步都绿。
+#  2. **清掉换线前的残留再装**：一棵旧线的 `pnpm-lock.yaml`（或装了旧树的 node_modules）
+#     会让安装直接失败，而失败之后 node_modules 停在旧版本上，后面每一步都绿。
 #     清锁清树写在 `swap` 里，本地复现与 CI 走同一条路径。
 #
 # ## 声明面是**若干个族**的并集，换版只动其中一族
@@ -149,26 +149,29 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # pnpm 必须排在 setup-node 之前，否则 `cache: pnpm` 找不到 store。
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
+          cache: pnpm
 
-      # 刻意**不跑 npm ci**：要的是一棵按新声明重新解析出来的树。先 ci 再改，npm 会拿旧树去
-      # reconcile，实测直接 ERESOLVE（exit 1）并且 node_modules 原封不动停在旧版本上 ——
+      # 刻意**不跑 frozen 安装**：要的是一棵按新声明重新解析出来的树。先装再改，包管理器会拿
+      # 旧树去 reconcile，实测直接失败（exit 1）并且 node_modules 原封不动停在旧版本上 ——
       # 后面的测试于是全绿，报出一个假兼容。
       #
-      # 一棵换线前的 `package-lock.json` 同样会挡住解析（2026-10-05 实测：锁把旧线的
-      # `dsh-sandbox-policy` 钉在那里，它要的 `dsh-agent` 与根声明的新区间对不上
-      # → ERESOLVE，后面每一步全塌）。清锁清树因此写进 `swap` 自己：
+      # 一棵换线前的 `pnpm-lock.yaml` 同样会挡住解析。清锁清树因此写进 `swap` 自己：
       # 本地复现与 CI 走同一条路径，不指望调用方记得。
       #
       # 换包只替换**目标族**里的下限版本，其余族原样保留（声明面是两族并集，见脚本头部）；
       # `engines.dsh` 与依赖段同进同退，否则 redlines 的「逐字相同」每周必红。
       #
-      # 这一步同时完成「装」与「核对实装版本」（`swap` 内部先跑裸 npm install，再跑 verify）：
-      # 分开写会留下「只跑了前半段」的口子，而 npm install 失败时 node_modules 会停在旧版本上，
-      # 让后面每一步都绿。`--ignore-scripts` 是必须的：本包的 prepare 会跑 npm run build（内含 tsc），
+      # 这一步同时完成「装」与「核对实装版本」（`swap` 内部先跑一次不带 frozen 的安装，再跑 verify）：
+      # 分开写会留下「只跑了前半段」的口子，而安装失败时 node_modules 会停在旧版本上，
+      # 让后面每一步都绿。`--ignore-scripts` 是必须的：本包的 prepare 会跑 build（内含 tsc），
       # 类型面一漂移 tsc 就非零退出，install 本身失败，什么也测不到。构建由下面的步骤显式驱动。
       - name: Swap onto ${{ matrix.line }}, install, and confirm what got installed
         id: verify
@@ -177,16 +180,16 @@ jobs:
       - name: Typecheck
         id: typecheck
         continue-on-error: true
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       # 跑的是现有套件，一条新断言都不加。
       - name: Run the existing suite
         id: suite
         continue-on-error: true
-        run: npm test
+        run: pnpm test
 
       # 只在套件红了之后跑，用来分流「类型面」与「行为面」：
-      # npm test = build && vitest，tsc 一挂 vitest 根本不跑，会把「只有类型动了」误报成
+      # pnpm test = build && vitest，tsc 一挂 vitest 根本不跑，会把「只有类型动了」误报成
       # 「整套挂了」。tsc 默认 noEmitOnError=false，报错仍会产出 lib/，所以这里能重建产物
       # 并真的跑到测试。
       - name: Diagnose — separate the type surface from the behaviour surface
@@ -208,8 +211,8 @@ jobs:
             echo "| 步骤 | 结果 |"
             echo "| --- | --- |"
             echo "| 换包 + 安装 + 核对装出来的版本 | ${{ steps.verify.outcome }} |"
-            echo "| 类型面（npm run typecheck） | ${{ steps.typecheck.outcome }} |"
-            echo "| 全量测试（npm test） | ${{ steps.suite.outcome }} |"
+            echo "| 类型面（pnpm run typecheck） | ${{ steps.typecheck.outcome }} |"
+            echo "| 全量测试（pnpm test） | ${{ steps.suite.outcome }} |"
             if [ -n "${{ steps.diagnose.outcome }}" ] && [ "${{ steps.diagnose.outcome }}" != "skipped" ]; then
               echo "| 分流诊断（跳过 tsc 的类型面） | ${{ steps.diagnose.outcome }} |"
             fi
@@ -253,31 +256,37 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # pnpm 必须排在 setup-node 之前，否则 `cache: pnpm` 找不到 store。
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
+          cache: pnpm
 
-      # 刻意**不跑 npm ci**：要的是一棵按新声明重新解析出来的树。先 ci 再改，npm 会拿旧树去
-      # reconcile，实测直接 ERESOLVE（exit 1）并且 node_modules 原封不动停在旧版本上 ——
+      # 刻意**不跑 frozen 安装**：要的是一棵按新声明重新解析出来的树。先装再改，包管理器会拿
+      # 旧树去 reconcile，实测直接失败（exit 1）并且 node_modules 原封不动停在旧版本上 ——
       # 后面的测试于是全绿，报出一个假兼容。
       #
-      # 一棵换线前的 `package-lock.json` 同样会挡住解析（2026-10-05 实测：锁把旧线的
-      # `dsh-sandbox-policy` 钉在那里，它要的 `dsh-agent` 与根声明的新区间对不上
-      # → ERESOLVE，后面每一步全塌）。清锁清树因此写进 `swap` 自己：
+      # 一棵换线前的 `pnpm-lock.yaml` 同样会挡住解析。清锁清树因此写进 `swap` 自己：
       # 本地复现与 CI 走同一条路径，不指望调用方记得。
       #
       # 换包只替换区间里的**下限版本**，运算符与上界原样保留 —— 声明面不会在 CI 里悄悄变形；
       # `engines.dsh` 与依赖段同进同退，否则 redlines 的「逐字相同」每周必红。
       #
-      # 这一步同时完成「装」与「核对实装版本」（`swap` 内部先跑裸 npm install，再跑 verify）：
-      # 分开写会留下「只跑了前半段」的口子，而 npm install 失败时 node_modules 会停在旧版本上，
-      # 让后面每一步都绿。`--ignore-scripts` 是必须的：本包的 prepare 会跑 npm run build（内含 tsc），
+      # 这一步同时完成「装」与「核对实装版本」（`swap` 内部先跑一次不带 frozen 的安装，再跑 verify）：
+      # 分开写会留下「只跑了前半段」的口子，而安装失败时 node_modules 会停在旧版本上，
+      # 让后面每一步都绿。`--ignore-scripts` 是必须的：本包的 prepare 会跑 build（内含 tsc），
       # 类型面一漂移 tsc 就非零退出，install 本身失败，什么也测不到。构建由下面的步骤显式驱动。
       # `--only <族前缀>` **不能省**（2026-10-12 实测）：并集区间下，安装器会在 `latest` 指向的
       # 版本能满足区间时优先用它，于是不收窄就会装出**混合树**，后面几步跑的不是承诺线那条族，
       # 而 `verify` 的红来自解析规则、不是宿主不兼容。姊妹仓 dsh-workbuddy-bridge 首跑即此。
       # （具体前缀是机器输入，写在下面的 run 里；这里不抄值。）
+      #
+      # ⚠️ 上面那三条成因最早是量 npm 的行为量出来的。迁到 pnpm 之后**逐条重测过**（2026-10-14），
+      # 结论都仍然成立；实测记录见 scripts/compat-swap.mjs 的文件头。
       - name: Swap onto the next line, install, and confirm what got installed
         id: verify
         continue-on-error: true
@@ -286,12 +295,12 @@ jobs:
       - name: Typecheck
         id: typecheck
         continue-on-error: true
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Run the existing suite
         id: suite
         continue-on-error: true
-        run: npm test
+        run: pnpm test
 
       - name: Diagnose — separate the type surface from the behaviour surface
         id: diagnose

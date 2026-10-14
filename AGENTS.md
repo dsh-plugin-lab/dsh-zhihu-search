@@ -29,9 +29,9 @@
     **注意那三条例行断言**（[test/redlines.test.ts](test/redlines.test.ts) 的 `peer ↔ dev 版本一致`、上下文相关包名单、声明面自洽）
     **都不覆盖「服务提供方是否被声明」** —— 删掉 peer 它们照样全绿，所以「全绿」不能当作这类改动的判据。
   理由、机制出处与替代方案见[决策记录](.agents/notes/2026-09-20-plugin-manager-dependency-kind.md)。
-- **插件展示元数据（宿主界面上的名字、描述与图标）只住在包根**：[locale/](locale/) 的 `meta.title` / `meta.description` 是文案的唯一来源，[icon.svg](icon.svg) 是图标的唯一来源（由 `package.json` 顶层 `icon` 声明）。别处只留指针、不复制 —— 抄一份就有两处会漂，而宿主**读不到时不报错**（名字退回技术名；图标位空着就退回面板默认图案）。两者都由 [scripts/plugin-metadata.mjs](scripts/plugin-metadata.mjs) 判定随包与可解析（`npm run check:release` 与 [test/plugin-metadata.test.ts](test/plugin-metadata.test.ts) 读同一份），理由与回落链见[决策记录](.agents/notes/2026-09-22-plugin-display-metadata.md)，图标几何与配色判据见[图标记录](.agents/notes/2026-09-22-plugin-icon.md)
+- **插件展示元数据（宿主界面上的名字、描述与图标）只住在包根**：[locale/](locale/) 的 `meta.title` / `meta.description` 是文案的唯一来源，[icon.svg](icon.svg) 是图标的唯一来源（由 `package.json` 顶层 `icon` 声明）。别处只留指针、不复制 —— 抄一份就有两处会漂，而宿主**读不到时不报错**（名字退回技术名；图标位空着就退回面板默认图案）。两者都由 [scripts/plugin-metadata.mjs](scripts/plugin-metadata.mjs) 判定随包与可解析（`pnpm run check:release` 与 [test/plugin-metadata.test.ts](test/plugin-metadata.test.ts) 读同一份），理由与回落链见[决策记录](.agents/notes/2026-09-22-plugin-display-metadata.md)，图标几何与配色判据见[图标记录](.agents/notes/2026-09-22-plugin-icon.md)
 - **四个「通用 lint 那一档」的编译器开关仍在**（`noUnusedLocals` / `noUnusedParameters` / `noImplicitReturns` / `noFallthroughCasesInSwitch`），缺任何一个覆盖面就不成立 → 由 [test/redlines.test.ts](test/redlines.test.ts) 断言；client / test 两个 project 都 extends 根 `tsconfig.json`，一处生效三处。**它们与 ESLint 的分工**（开关管类型与死代码、ESLint 管编译器覆盖不到的那一档）见 [决策记录](.agents/notes/2026-09-27-adopt-eslint-prettier.md)
-- **发布态不变量由脚本守卫**（`dsh.bundle.patch` 在、`private` 没设、`engines.dsh` 声明了、`files` 带 `cordis.patch.yml`、LICENSE 在）→ `npm run check:release`，[release.yml](.github/workflows/release.yml) 发布前跑。**端到端验收**（真实接口 + 宿主 `output.schema` 校验，补的正是 v1.4.0 那类漏）同样在 [release.yml](.github/workflows/release.yml)、**publish 前**跑一次：`node scripts/acceptance.mjs .`，**红了不发**，需要仓库 secret `ZHIHU_ACCESS_SECRET` → [scripts/acceptance.mjs](scripts/acceptance.mjs)
+- **发布态不变量由脚本守卫**（`dsh.bundle.patch` 在、`private` 没设、`engines.dsh` 声明了、`files` 带 `cordis.patch.yml`、LICENSE 在）→ `pnpm run check:release`，[release.yml](.github/workflows/release.yml) 发布前跑。**端到端验收**（真实接口 + 宿主 `output.schema` 校验，补的正是 v1.4.0 那类漏）同样在 [release.yml](.github/workflows/release.yml)、**publish 前**跑一次：`node scripts/acceptance.mjs .`，**红了不发**，需要仓库 secret `ZHIHU_ACCESS_SECRET` → [scripts/acceptance.mjs](scripts/acceptance.mjs)
 - 决策理由 → [.agents/notes/](.agents/notes/)
 - 发版授权：patch / minor 按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定档后**直接发**；**major 必须先问人类**；**零行为变更不发版**（纯文档 / 测试 / CI / 等价重构）
 
@@ -46,9 +46,9 @@
 
 ## 常用命令
 
-- 本地钩子：`pre-commit install`（每个 clone 一次；本体 `uv tool install pre-commit`）——提交前自动 `prettier --write` + `eslint --fix`（`npx --no-install`，不联网）；CI 只读新增 format:check；全量跑 `pre-commit run --all-files`；临时跳过 `git commit --no-verify`；定义见 [.pre-commit-config.yaml](.pre-commit-config.yaml)
+- 本地钩子：`pre-commit install`（每个 clone 一次；本体 `uv tool install pre-commit`）——提交前自动 `prettier --write` + `eslint --fix`（`pnpm --config.verify-deps-before-run=false exec`，不联网）；CI 只读新增 format:check；全量跑 `pre-commit run --all-files`；临时跳过 `git commit --no-verify`；定义见 [.pre-commit-config.yaml](.pre-commit-config.yaml)
 
-- `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）· `npm run test:contract`（打真实接口，需 `ZHIHU_ACCESS_SECRET`，日常 CI 不跑）
+- `pnpm run build`（host tsc + client tsc + esbuild）· `pnpm run typecheck` · `pnpm test`（先 build 再 vitest）· `pnpm run test:contract`（打真实接口，需 `ZHIHU_ACCESS_SECRET`，日常 CI 不跑）
 - 真机验收：`ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]` —— 默认验 profile 里装的那份，覆盖真实接口 + 宿主 schema 校验 + 渲染文本，见 [scripts/README.md](scripts/README.md)
 - **发版两步，顺序是死的**：① 本地 `npm version <档位> [--preid=alpha] --no-git-tag-version` → `git commit`；② `gh workflow run release.yml`（**没有 tier 参数** —— workflow 只发 `package.json` 里那个号，它不 bump）。档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定；**dist-tag 由版本自己那段推**（`2.0.0-alpha.1` → `alpha`，稳定档 → `latest`）；同一条 X.Y.Z 线上推下一个 alpha 要用 `prerelease`，不是 `premajor`（后者开新线，从 `2.0.0-alpha.0` 会得到不可覆盖的 `3.0.0-alpha.0`）；无行为变更时 [守卫](scripts/release-guard.mjs) 会拦下（`-f force=true` 才能越过）
 - 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap <线>` —— 一条命令走完「改写整条声明面 → 清掉旧线的锁与树 → 裸 `npm install --ignore-scripts` → 核对实装版本」；测某一族（尤其低族）时加 `--only <前缀>` 临时把声明面收窄成单族（并集区间会被 npm 解析成装最高族，不收窄就测不到低族）。全部子命令见 [scripts/README.md](scripts/README.md)
@@ -57,9 +57,9 @@
 
 数字与版本一律看自更新来源（理由见「[文档网络与自更新](#文档网络与自更新)」）：测试与类型检查 → [Actions](https://github.com/dsh-plugin-lab/dsh-zhihu-search/actions)，发布版本 → [npm](https://www.npmjs.com/package/dsh-zhihu-search)。下面只记不随数字漂移的定性结论；更早轮次的真机验证见 [.agents/notes/](.agents/notes/) 与 `git log`。
 
-- 契约测试：本机与 GitHub Actions 都实跑通过（后者由 repo secret `ZHIHU_ACCESS_SECRET` 供燃料）；每周一由 [contract.yml](.github/workflows/contract.yml) 跑；日常 `npm test` 不含 live 探针，只多一份底座的离线自检
+- 契约测试：本机与 GitHub Actions 都实跑通过（后者由 repo secret `ZHIHU_ACCESS_SECRET` 供燃料）；每周一由 [contract.yml](.github/workflows/contract.yml) 跑；日常 `pnpm test` 不含 live 探针，只多一份底座的离线自检
 - 真机验收：[scripts/acceptance.mjs](scripts/acceptance.mjs) 覆盖扩池 / 输出对称 / www 归一化 + 宿主 schema 校验 + 渲染文本；升级 + host 重启后在 profile 安装副本上跑通，工具面同参数复验一致
-- 发版守卫：只有文档 / 工具脚本改动的区间在 `npm ci` 之前被拦下（后续步骤全 skipped，npm 侧零动作）；含 `src/` 的区间正常放行
+- 发版守卫：只有文档 / 工具脚本改动的区间在 `pnpm install --frozen-lockfile --config.node-linker=hoisted` 之前被拦下（后续步骤全 skipped，npm 侧零动作）；含 `src/` 的区间正常放行
 - 诚实渲染：到顶必说 / 来源构成分流 / 空态首句条件限定由 [test/presentation.test.ts](test/presentation.test.ts) 固化；`count` 回满上限不额外提示（刻意防噪音）
 - 宿主兼容性：由 [compat.yml](.github/workflows/compat.yml) 每周对 `next`（承诺线）与 `alpha`（**已低于声明下限，只记录**）换包，跑的是现有套件、不写新测试；结论与处理链归 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。这里只留定性结论：**类型面会先于行为面动**，所以「测试全绿」不能当作「兼容」的结论。**2026-09-24 承诺线迁到 `next`；2026-10-10 下限跟着抬到 RC 线起点**（此前下界停在 alpha 线那一段上，在 npm 的预发布语义下**永远罩不住** `next` 上的版本 —— 元组对不上，正是 issue #2 的 `declaration` 那条红）。具体值一律现查 `npm view @deepseek-ai/dsh dist-tags`，区间形状查 [package.json](package.json) 的 `engines.dsh`；理由是[决策记录](.agents/notes/2026-10-10-declaration-floor-to-rc-line.md)
 - 明文迁徙：**真机跑通**（2026-09-16）—— 装入 1.6.2 + 重启 host 后，`settings.yaml` 的 `zhihu-search:` 段只剩 `disableNativeWebSearch`，值（40 位十六进制、与原明文逐字一致）落进 `.credentials.yaml` 的 `refs`，两个文件同一秒被改写。此前在 `lib/` 产物 + 真实 provider + 本机 `settings.yaml` **副本**上也跑通过（段内清理、其他 section 与注释原样保留、第二次运行是空操作）。
@@ -75,7 +75,7 @@
 - **真机验收未做**：迁移后的卡片只有在「插件装回 profile + 宿主重启」之后才谈得上验收，装回由主 agent 收尾统一做；验收口径见 [scripts/README.md](scripts/README.md) 与 [docs/PUBLISHING.md](docs/PUBLISHING.md)
 - **npm 上已发布版本的头图**：已核结清 —— `latest` 现为 2.0.0（现查 `npm view dsh-zhihu-search dist-tags`），那一页按 HEAD 的 README 渲染、图指 `assets/banner.svg`（现存文件），**不再断**。更早版本（v1.6.3 及以前）的页面文字发布时已定死、仍指被删的 `cover.svg`；**裁定：不为几个历史页面把 `cover.svg` 补回仓库**（那等于让一个没人引用的文件常驻），要真有人被误导再谈。
 - **文档校验脚本还没落进本仓**：AGENTS 的「能落成校验的不写散文」这条目前对文档是空的（链接与行尾没有执行体）。容器仓 `dsh-plugins/scripts/check-links.py` 是本机可用的实现，收进来时要顺带回答「CI 跑不跑它」（`ci.yml` 现在没有 docs 步骤）
-- **`prepare` 与 `dsh-ds-balance` 相反，本仓零解释**：本仓 `package.json` 声明 `"prepare": "npm run build"`，而 DSB 明文「本仓**不**声明 `prepare` —— 声明了 CI 的 `npm ci` 会先产出 `lib/`，`artifacts.test.ts` 那种『干净检出』判据就永远绿不到点上（那边踩过，见其决策记录）」。两仓同源，一个声明一个刻意不声明。**要么删掉本仓的 `prepare`，要么写清本仓为什么例外**（例如 profile 用 `link:` 挂载时依赖它保证产物新鲜）—— 属跨仓取舍，未裁
+- **`prepare` 与 `dsh-ds-balance` 相反，本仓零解释**：本仓 `package.json` 声明 `"prepare": "pnpm run build"`，而 DSB 明文「本仓**不**声明 `prepare` —— 声明了 CI 的 `pnpm install --frozen-lockfile --config.node-linker=hoisted` 会先产出 `lib/`，`artifacts.test.ts` 那种『干净检出』判据就永远绿不到点上（那边踩过，见其决策记录）」。两仓同源，一个声明一个刻意不声明。**要么删掉本仓的 `prepare`，要么写清本仓为什么例外**（例如 profile 用 `link:` 挂载时依赖它保证产物新鲜）—— 属跨仓取舍，未裁
 
 - **宿主推出新族（新的 major.minor.patch 预发布）时的处置**：声明面是并集，**不会自动罩住**新族。要不要加承诺是人工决定 —— 加则**手动**两处（[package.json](package.json) 的 `engines.dsh` 与 27 条声明加一族；[compat.yml](.github/workflows/compat.yml) 的测试矩阵加一行），之后 CI 自动跑；不加则那一族不在承诺内、也不测。判据与代价见[决策记录](.agents/notes/2026-10-10-two-families-declared.md)
 
@@ -99,14 +99,14 @@
     判据：在锁文件里搜那个目录名；处置：重新解析，别手工编辑锁文件。
 
 - **生效链取决于 profile 怎么挂的，先查再假设**：`Get-Item <profile>\node_modules\dsh-zhihu-search | Select LinkType,Target`。
-  - **符号链接到仓库**：`npm run build`（含 `npm test` 的 build）**直接写线上**，`dsh-client-hmr` 轮询 `lib/client.js` 当场换掉**浏览器半体**；host 半体要重启才换。改客户端半体因此免发版即生效，但**构建即上线** —— 没验证过的构建会立刻影响正在用的界面。
+  - **符号链接到仓库**：`pnpm run build`（含 `pnpm test` 的 build）**直接写线上**，`dsh-client-hmr` 轮询 `lib/client.js` 当场换掉**浏览器半体**；host 半体要重启才换。改客户端半体因此免发版即生效，但**构建即上线** —— 没验证过的构建会立刻影响正在用的界面。
   - **普通目录（registry 副本）**：build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>` → 重启。按版本安装会把链接换成副本，开发环也就断了。
   - 两种模式下 host 半体都只在启动时读，**必重启**；`dsh.profile.bundles` 同理。
 
 - **`link:` 到 profile 外的插件，仓库必须自己装好 peer deps**（`npm install` 会做到）——
   它按**仓库路径**解析 `@deepseek-ai/*`，走不到 profile 的兜底目录；
   少了报 `ERR_MODULE_NOT_FOUND`、插件显示「未运行」。
-- **半体可以错配**：浏览器半体热更、host 半体不热更，两者版本因此可能不一致（一次 build 或一次安装就能造成）。v1.6.0 的卡片回归就是这样暴露的 —— 维护者没装任何东西，仓库里一次 `npm run build` 就把线上浏览器半体换成了带 bug 的构建，而 host 半体仍是旧的（启动期迁徙因此从未执行）。**看到客户端半体报错时，别假设 host 半体是同一个版本。**
+- **半体可以错配**：浏览器半体热更、host 半体不热更，两者版本因此可能不一致（一次 build 或一次安装就能造成）。v1.6.0 的卡片回归就是这样暴露的 —— 维护者没装任何东西，仓库里一次 `pnpm run build` 就把线上浏览器半体换成了带 bug 的构建，而 host 半体仍是旧的（启动期迁徙因此从未执行）。**看到客户端半体报错时，别假设 host 半体是同一个版本。**
 - **产物三副本**：改工具输出字段必须**同时**改 Canonical 类型、投影层、`output.schema`；宿主按最后一份校验（`additionalProperties: false`），漏一处 = 整个工具调用失败（v1.4.0 的 P0 → [复盘](docs/postmortem/2026-09-14-output-schema-drift.md)）。
 - **DSH scope 机制**：原生网页工具**不在全局层**（住在 agent preset 的 standing scope），判断存在性必须站在 agent scope 上；取注册表只能走**免 inject 的 `agent.ctx.get('tools')`**（属性访问抛 `without inject`）。v1.3.0 因读全局视图而静默失效 → [复盘](docs/postmortem/2026-09-14-hidden-tool-restriction-noop.md)。
 - **inject 门禁按服务名逐字判**：`ctx.x` 属性访问要求 `x` **逐字**出现在某个 fiber 的 `inject` 里，点号键**不展开**成父级 —— 声明了 `remote.credentials` **不等于**能访问 `ctx.remote`。同一机制已踩中两次（agent scope 的 `tools`、客户端半体的 `remote`，后者让卡片整块装不上）；碰平台服务先看官方同类插件的 `inject` 怎么声明 → [复盘](docs/postmortem/2026-09-15-client-inject-remote-missing.md)。

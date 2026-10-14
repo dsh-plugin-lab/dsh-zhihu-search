@@ -7,7 +7,7 @@
 - 卡片**自己订阅**表单快照（`getSnapshot` + `subscribe`，走 `useSyncExternalStore`）：没有页面重渲染这条路可等。命名空间不在册（`status === 'unavailable'`）或宿主不可写时按「不可写」渲染，沿用既有只读文案，不新增可见状态。
 - 能力探测：这条链有**两环**（服务 `configForms`、槽 `plugins.bundle.config`），各自缺席都不报错、界面静默缺席 —— 两环**各给一个超时窗口**，到点仍在缺席的那一环往**客户端控制台**写一条英文 WARN；那一环迟到则补一条 INFO 撤销它自己那条。只加提示路径，注册的槽名 / key / 时机一字不改，探测失败不影响任何既有功能。**服务缺席时槽那一环不发声**（一次超时只发一条，报的是真正断掉的那一环）。
 - 被谁依赖：DSH Web 的客户端模块系统按包清单的 `dsh.client` 扫描并加载 `lib/client.js`。
-- 改后必测：`npm test` 的 [产物契约](../../test/README.md)（信封 id、导出面、inject 装配、注册 key）与 [credential-store 单测](../../test/credential-store.test.ts)。
+- 改后必测：`pnpm test` 的 [产物契约](../../test/README.md)（信封 id、导出面、inject 装配、注册 key）与 [credential-store 单测](../../test/credential-store.test.ts)。
 
 ## 视觉与结构
 
@@ -35,7 +35,7 @@
 - 改**渲染面**（文案值、JSX 结构、样式对象、可见状态）→ **必须同批重截** [assets/](../../assets/) 的两张卡片图；触发判据、步骤与验收见 [assets/AGENTS.md](../../assets/AGENTS.md)。
 - 改 locale 命名空间 → 必须与槽位注册的 `locale:` 一致，否则 `t` 取不到值、界面显示 key 本身。
 - 改探测窗口或提示文案 → 跑 [产物测试](../../test/client-bundle.test.ts) 的「配置能力探测」一组（两环各一个窗口：都按时到达不发声 / 服务缺席报服务 / 服务在槽缺席报槽 / 迟到各撤各的 / 服务缺席时槽不跟着喊），并同步根 [README.md](../../README.md) 的「版本兼容」。**提示里点名的槽必须是实际注册的那个**（`plugins.bundle.config`）—— 探测说要装 A、卡片装进 B，是最坏的一种「说谎」，测试对此有断言。
-- 改完必须 `npm run build`。客户端半体由 `dsh-client-hmr` 轮询 `lib/client.js` 就地换装；**host 半体换不了**。
+- 改完必须 `pnpm run build`。客户端半体由 `dsh-client-hmr` 轮询 `lib/client.js` 就地换装；**host 半体换不了**。
   生效链**取决于本机 profile 怎么挂的**（先 `Get-Item <profile>\node_modules\dsh-zhihu-search | Select LinkType,Target`）：符号链接到仓库时构建**直接写线上浏览器半体**；版本化副本则要 build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>`。两种模式下 host 半体都要重启 → 见 [../AGENTS.md](../AGENTS.md) 的活跃坑。
 
 ## 参考

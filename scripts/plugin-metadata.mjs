@@ -13,7 +13,7 @@
  * 「5. Add optional plugin display metadata」与 `packages/boot/app-boot/src/package-meta.ts`。
  *
  * 两个消费者读同一份判定，避免两处各写一套：
- * - [check-release.mjs](check-release.mjs)（`npm run check:release`，release.yml 发布前跑）
+ * - [check-release.mjs](check-release.mjs)（`pnpm run check:release`，release.yml 发布前跑）
  * - [../test/plugin-metadata.test.ts](../test/plugin-metadata.test.ts)（`npm test`）
  *
  * 图标那几条的判据照抄宿主 `iconOf`：扩展名名单、**留在清单目录内**、普通文件、≤ 256 KiB

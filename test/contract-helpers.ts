@@ -6,7 +6,7 @@
  * 因此这里只依赖 `fetch`，与实现完全解耦 —— 上游变了，它必须红。
  *
  * 运行方式：
- * - 本地：`ZHIHU_ACCESS_SECRET=xxx npm run test:contract`
+ * - 本地：`ZHIHU_ACCESS_SECRET=xxx pnpm run test:contract`
  * - CI：每周一由 [.github/workflows/contract.yml](../.github/workflows/contract.yml) 跑
  *   （不进日常 CI：它花真实配额，见 [README.md](README.md)）
  *

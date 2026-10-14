@@ -4,7 +4,7 @@
 
 ## 文件索引
 
-- `build-client.mjs`：用 esbuild 生成浏览器半体的 lazy-CJS 工厂信封（`window.__ModuleLoader__.load({ id, factory })`），被 `npm run build` 调用，产物为 `lib/client.js`。
+- `build-client.mjs`：用 esbuild 生成浏览器半体的 lazy-CJS 工厂信封（`window.__ModuleLoader__.load({ id, factory })`），被 `pnpm run build` 调用，产物为 `lib/client.js`。
   信封为何必须长这样、官方预设为何不能直接用 → 见 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「构建链的两个事实」，此处不重述。
   **信封 id（`BUNDLE_ID`）读 `package.json` 的 `name`**，不在脚本里手抄包名；它必须等于包名（模块表以它作 key）。
 - `release-guard.mjs`：**发版守卫**。从 stdin 读「上个 tag..HEAD」的改动清单，判定这段区间是否真的改变了已发布产物；只剩非产物改动时以非零退出码拦下发布。
@@ -13,8 +13,8 @@
   机制与回落链（标题 `meta.title` → `name` → 完整 Cordis 名；描述 `meta.description` → `package.json.description` → 不显示）归 DSH：`docs/cookbook/adding-a-package.md` 的「5. Add optional plugin display metadata」与 `packages/boot/app-boot/src/package-meta.ts`，本仓库不复制。
 - `plugin-metadata.d.mts`：上面那个判定模块的**类型面**（手写）。为什么手写而不是打开 `allowJs`：`tsconfig.test.json` 要 import 这个 `.mjs`，而 `allowJs` 会把本目录另外几个脚本一起拖进 `strict` 的检查面 —— 那是另一件事。**改实现时同批改它**，漂了不会静默（typecheck 与测试都会红）。
 
-- `check-release.d.mts`：上面那个守卫的**类型面**（手写，理由与 `plugin-metadata.d.mts` 同：开 `allowJs` 会把本目录另外几个 `.mjs` 一起拖进 `strict` 检查面）。**改实现时同批改它**，漂了不会静默 —— `npm run typecheck` 会红。
-- `check-release.mjs`：**发布态守卫**。断言五条发布态不变量（`dsh.bundle.patch` 在、`private` 未设、`engines.dsh` 已声明、`files` 含 `cordis.patch.yml`、LICENSE 在）**外加展示元数据与图标那几条**，被 `npm run check:release` 调用、[release.yml](../.github/workflows/release.yml) 发布前跑。
+- `check-release.d.mts`：上面那个守卫的**类型面**（手写，理由与 `plugin-metadata.d.mts` 同：开 `allowJs` 会把本目录另外几个 `.mjs` 一起拖进 `strict` 检查面）。**改实现时同批改它**，漂了不会静默 —— `pnpm run typecheck` 会红。
+- `check-release.mjs`：**发布态守卫**。断言五条发布态不变量（`dsh.bundle.patch` 在、`private` 未设、`engines.dsh` 已声明、`files` 含 `cordis.patch.yml`、LICENSE 在）**外加展示元数据与图标那几条**，被 `pnpm run check:release` 调用、[release.yml](../.github/workflows/release.yml) 发布前跑。
   口径是「能否改变 npm 上的产物」而非「文件是否随包发布」：`build-client.mjs` 自己不随包，却决定 `lib/client.js` 长什么样，所以算产物改动。接线在 [release.yml](../.github/workflows/release.yml)，判定规则归 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的 Q0。
 - `acceptance.mjs`：**验收脚本**。对指定包目录的产物打真实接口，验三件事：下限扩池、输出面与排序档位对称、`site` 归一化；每条都过一遍宿主的 `output.schema` 校验器，并打印模型可见文本。
   用法 `ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]`，默认验本机 profile 里装的那份；退出码非 0 即有未通过项。
@@ -23,8 +23,8 @@
   子命令三条：`swap <线> [--drop <前缀> | --only <前缀>]`（一条命令走完四步，见下）、`verify <线>`（只核对）、`selftest`（形状表与整份换版的离线自检）。
   `swap` 的四步是**一次**动作，拆开写就会留下「只跑了前半段」的口子：
   1. **改写声明面**：三个依赖段里每条 `@deepseek-ai/dsh-*` **外加 `engines.dsh`**（宿主本体既不在依赖段里、名字也不带 `dsh-` 尾巴，所以单独处理；manifest 缺这个键直接抛错，不把声明面落在半路）。
-  2. **清掉换线前的残留**：`package-lock.json` 与 `node_modules`。换线是**整棵树搬家** —— 旧锁记着旧线的解析、旧树装着旧线的包，拿着它们去装新声明的 manifest 会直接 ERESOLVE（2026-10-05 巡检的 `committed` 就是这么红的）。
-  3. **裸 `npm install`**：固定带 `--ignore-scripts`（本包声明了 `prepare` = `npm run build`，不带它 install 会先 build，类型面一漂移 install 自己就挂，类型面与行为面再也分不开）；`--legacy-peer-deps` / `--force` 一律不用，理由见脚本头部注释（实测结论，不是推断）。
+  2. **清掉换线前的残留**：`pnpm-lock.yaml` 与 `node_modules`。换线是**整棵树搬家** —— 旧锁记着旧线的解析、旧树装着旧线的包，拿着它们去装新声明的 manifest 会直接 ERESOLVE（2026-10-05 巡检的 `committed` 就是这么红的）。
+  3. **一次不带 frozen 的安装**：固定带 `--ignore-scripts`（本包声明了 `prepare` = `pnpm run build`，不带它 install 会先 build，类型面一漂移 install 自己就挂，类型面与行为面再也分不开）；`--legacy-peer-deps` / `--force` 一律不用，理由见脚本头部注释（实测结论，不是推断）。
   4. **`verify` 核对实装版本**：先验 `engines.dsh`，再逐包断言 `node_modules` 里的版本就是目标线的版本。它自己有独立价值 —— `npm install` 会**假绿**（失败但树停在旧版本上，随后测试全绿）。
   **声明面是若干个族（`||`）的并集**，换版语义是「**保留旧族、只替换目标族**」：按「元组相同」定位要换的那一族，其余族原样留着。两个改族集合的开关：
   - `--drop <前缀>`：显式删掉一族（换线到新族、放弃旧族时用）。
@@ -33,7 +33,7 @@
   为什么是「改写 package.json + 裸 `npm install`」而不是 `npm install <包>@<tag>`：后者会清空某个恰好没被点名的包的目录（实测 `dsh-client-locale` / `dsh-client-ui-primitives` 都中过），是假红；正路与全部实测理由见脚本头部注释。
 
 - `check-declaration.mjs`：**声明面判定**（与 [compat.yml](../.github/workflows/compat.yml) 的 `declaration` 作业同一实现，也是这件事**唯一**的实现 —— `compat-swap.mjs` 不再自带一份同名判定）。只读 `package.json`、再问 npm，断言「我们声明的区间还罩不罩得住**承诺线**」，并同时看 `engines.dsh` 与三个依赖段里的每一条。
-  承诺线是脚本里的 `TRACKED_LINE` 常量（当前 `next`）——为什么是它，见 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「兼容性」。入口：`npm run check:declaration`（要换一条线判就 `node scripts/check-declaration.mjs --line <tag>`）。
+  承诺线是脚本里的 `TRACKED_LINE` 常量（当前 `next`）——为什么是它，见 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「兼容性」。入口：`pnpm run check:declaration`（要换一条线判就 `node scripts/check-declaration.mjs --line <tag>`）。
   红了 = 声明面罩不住我们推荐用户装的那条线：要么放宽声明，要么抬下限（抬下限会动使用者面，档位按 PUBLISHING 的判定问题链走）。
   注意：声明下限**不等于**推荐线 —— 区间只要**罩得住**那条线就成立（区间形状见 [package.json](../package.json) 的 `engines.dsh`，具体宿主版本一律现查）。
 ## 变更影响路由
@@ -44,7 +44,7 @@
 - 改验收脚本 → 在真机 profile 上实跑一次（默认目标就是它），确认结论可复现；不进 `ci.yml`（花真实配额），但**发布闸**在 [release.yml](../.github/workflows/release.yml) 里跑一次，目标写 `.`（本次产物）。
 - 改守卫的判定口径 → 同步 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的 Q0 与判例库；改完用「纯文档区间」和「含源码区间」各喂一次 stdin，确认两个方向都对。
 - 改声明面判定（`TRACKED_LINE`、区间形状）→ 同步 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「兼容性」两节与两份 README 的前置版本（必同改）。
-- **改 `package.json` 的 `exports` / `files` / `description` / `icon`，或改 [locale/](../locale/) 的语言文件与包根 [icon.svg](../icon.svg) → 三处必须同批走**：① 包根 `locale/*.json` 两份（文案真源）与 `icon.svg`（图标真源）；② `package.json`（`files` 收录 `locale/*.json` 与 `icon.svg`、`exports` 暴露 `./locale/*.json` 与 `./package.json`、`description` 与 `locale/en.json` 的 `meta.description` 同内容、`icon` 声明留在清单目录内）；③ 回归 `npm run check:release` 与 `test/plugin-metadata.test.ts`（读同一份判定，含反向控制）。改了 `meta.title` 或图标还会挪动插件页上的显示名与外观 → 顺带走一次 [README.md](../README.md) / [README_en.md](../README_en.md) 的「配置」节与 [assets/AGENTS.md](../assets/AGENTS.md) 的判废项（**改图标 = 必须重截卡片图**）。
+- **改 `package.json` 的 `exports` / `files` / `description` / `icon`，或改 [locale/](../locale/) 的语言文件与包根 [icon.svg](../icon.svg) → 三处必须同批走**：① 包根 `locale/*.json` 两份（文案真源）与 `icon.svg`（图标真源）；② `package.json`（`files` 收录 `locale/*.json` 与 `icon.svg`、`exports` 暴露 `./locale/*.json` 与 `./package.json`、`description` 与 `locale/en.json` 的 `meta.description` 同内容、`icon` 声明留在清单目录内）；③ 回归 `pnpm run check:release` 与 `test/plugin-metadata.test.ts`（读同一份判定，含反向控制）。改了 `meta.title` 或图标还会挪动插件页上的显示名与外观 → 顺带走一次 [README.md](../README.md) / [README_en.md](../README_en.md) 的「配置」节与 [assets/AGENTS.md](../assets/AGENTS.md) 的判废项（**改图标 = 必须重截卡片图**）。
 - 改换包脚本的参与范围或判据 → 同步 [compat.yml](../.github/workflows/compat.yml) 的注释与 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「兼容性」节；**声明面的判定只有一处实现**（`check-declaration.mjs`），别在换包脚本里再养一份；改完后用 `node scripts/compat-swap.mjs selftest`（[test/compat-swap.test.ts](../test/compat-swap.test.ts) 跑同一条）与 [test/redlines.test.ts](../test/redlines.test.ts) 的「声明面自洽」复核。
 
 ## 参考

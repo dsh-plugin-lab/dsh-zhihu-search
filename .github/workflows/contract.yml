@@ -22,10 +22,15 @@ jobs:
       # 与 ci.yml 一致：v7 的 action 自带 node24 运行时。
       - uses: actions/checkout@v7
 
+      # pnpm 必须排在 setup-node 之前，否则 `cache: pnpm` 找不到 store。
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
+          cache: pnpm
 
       # 密钥缺席必须**红**，不能静默跳过：跳过等于这套机制不存在。
       # 契约测试文件里也有一条同名断言，两道一起拦。
@@ -38,12 +43,12 @@ jobs:
             exit 1
           fi
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile --config.node-linker=hoisted
 
       - name: Run contract tests against the live API
         env:
           ZHIHU_ACCESS_SECRET: ${{ secrets.ZHIHU_ACCESS_SECRET }}
-        run: npm run test:contract
+        run: pnpm run test:contract
 
       - name: Summarize
         if: always()

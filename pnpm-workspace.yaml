@@ -1,0 +1,14 @@
+# pnpm workspace root. Declared even with a single package — otherwise pnpm treats this as a
+# non-workspace directory and the dependency tree stops matching the one CI installs.
+packages:
+  - '.'
+
+# pnpm 11 reads its settings from here, **not** from the `pnpm` field in package.json (that field is
+# ignored, with a warning naming this file). Declared rather than answered at `pnpm approve-builds`
+# so a fresh clone and CI get the same answer without anyone being prompted.
+#
+# esbuild's postinstall is what puts its platform binary in place. Blocked, the browser bundle step
+# fails with a confusing "cannot find binary" instead of the real reason — hence an explicit yes.
+# Every other dependency's build scripts stay blocked, which is the point of the allowlist.
+allowBuilds:
+  esbuild: true

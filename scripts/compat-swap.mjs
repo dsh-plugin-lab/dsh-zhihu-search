@@ -32,28 +32,35 @@
  * 换版的语义随之变成「**保留旧族，只替换目标族**」：把当前声明里**元组与目标版本相同**的那一族
  * 换到目标版本，其余族原样留着。`--drop <前缀>` 显式删掉一族（换线到新族、放弃旧族时用）。
  *
- * **`--only <前缀>` 为什么必需**：并集区间对 npm 的含义是「这几族都合法」，它给每个包选的是
+ * **`--only <前缀>` 为什么必需**：并集区间对安装器的含义是「这几族都合法」，它给每个包选的是
  * **匹配集里最高的**那族。所以要**测**承诺里的某一族（尤其是低族），不能靠保留全部族 ——
- * 实测（2026-10-10）保留两族换到低族时，`npm install` 装到的仍是最高族，`verify` 18 项全红。
+ * 实测（2026-10-10）保留两族换到低族时，装到的仍是最高族，`verify` 18 项全红。
  * `--only` 把声明面**临时收窄成只有目标族**，测的就是那一族；这份收窄后的清单是一次性的，
  * **不提交**（提交的那份始终是并集声明面 —— 那是给使用者的承诺）。
  *
  * 代价写在决策记录里：**宿主再推一个补丁位的预发布**（新的 `major.minor.patch`）时，这条并集
  * 不会自动罩住它，需要**手动加一族**（或用本脚本换一次）—— 这是「跟多条预发布线」的固有代价。
  *
- * ## 为什么是「改写 package.json + 清锁 + 裸 npm install」
+ * ## 为什么是「改写 package.json + 清锁 + 重装」
  *
- * `npm install <包>@<tag>` 会清空某个**恰好没被点名**的包的目录（2026-09-16 实测多次假红）。
+ * 按名点包安装（`pnpm add <包>@<tag>` 那一类）会清空某个**恰好没被点名**的包的目录（2026-09-16 实测多次假红）。
  * `--legacy-peer-deps` 不能用（关掉 peer 自动安装，dsh-tools 自己的 peer 全缺席）；`--force`
  * 更坏（吞掉真实冲突、造出假绿）。
  *
- * **换线等于整棵树搬家，必须从零解**（2026-10-05 巡检的 `next` 作业实测）：旧 `package-lock.json`
- * 记着换线**前**的解析，拿它去装新声明的 manifest 会直接 ERESOLVE。装了旧树的 `node_modules` 同理。
- * 两者都由本脚本清掉，让 npm 只按新 manifest 解 —— 本地复现与 CI 走同一条路径。
+ * **换线等于整棵树搬家，必须从零解**（2026-10-05 巡检的 `next` 作业实测）：旧 `pnpm-lock.yaml`
+ * 记着换线**前**的解析，拿它去装新声明的 manifest 会直接失败。装了旧树的 `node_modules` 同理。
+ * 两者都由本脚本清掉，让安装器只按新 manifest 解 —— 本地复现与 CI 走同一条路径。
  *
- * 装的那一步固定带 `--ignore-scripts`：本仓声明了 `prepare`（= `npm run build`），裸装会先跑一次
+ * 装的那一步固定带 `--ignore-scripts`：本仓声明了 `prepare`（= `pnpm run build`），裸装会先跑一次
  * build，于是**类型面一漂移 install 自己就非零退出**，类型面与行为面再也分不开。构建由随后的
- * `npm run typecheck` / `npm test` 显式驱动。
+ * `pnpm run typecheck` / `pnpm test` 显式驱动。
+
+ * ⚠ 上面这几条成因最早是量 npm 的行为量出来的。迁到 pnpm 之后**逐条重测过**（2026-10-14）：
+ * `swap next --only 0.2.0` 在 pnpm 上装出 18 个包 + 宿主本体全部落在 next 线，verify 全过；
+ * 「清锁清树才装得出来」仍然必要。结论保留，实现换成 pnpm。
+ *
+ * 仍需留意：pnpm 删掉锁文件后是**重新解析**，装出来的那棵树与当初 npm 那次不是同一棵。
+ * 要比较两者的解析结果，得对同一份 manifest 各装一遍再比。
  *
  * ## 写回是**保形**的
  *
@@ -63,7 +70,7 @@
  *
  * ## 为什么必须有 verify
  *
- * `npm install` 会**假绿**：因上游 peer 冲突失败（exit 1）而 node_modules 停在旧版本上，随后
+ * 安装会**假绿**：因上游 peer 冲突失败（exit 1）而 node_modules 停在旧版本上，随后
  * typecheck 与全部测试全绿。所以换包之后必须**断言装出来的版本就是目标线的版本**，不过就红。
  * `verify` 还先验 `engines.dsh`：依赖段全绿而宿主本体落后时，只看 node_modules 会报出
  * 「N 个包全部落在目标线上」——一个假的干净结论。
@@ -257,7 +264,7 @@ function dropFamily(families, prefix) {
  *
  * 为什么需要它：声明面是**并集**，而 npm 解析一个并集区间时给每个包选的是**匹配集里最高的**那个版本。
  * 所以「测承诺里的某一族」不能靠保留全部族 —— 那样装出来的永远是最高族，低族根本测不到
- * （2026-10-10 实测：`swap 0.1.7-rc` 保留两族时，`npm install` 装到 0.2.0 族，`verify` 18 项全红）。
+ * （2026-10-10 实测：`swap 0.1.7-rc` 保留两族时，装到 0.2.0 族，`verify` 18 项全红）。
  * `--only` 把声明面**临时收窄成只有目标族**，测的就是那一族；测完的清单是一次性的，
  * 不提交（提交的那份仍是并集声明面 —— 那是给使用者的承诺）。
  *
@@ -487,12 +494,12 @@ function applyPlan(manifest, plan, hostVersion, dropPrefix, onlyPrefix) {
  * @returns {void}
  */
 function clearStaleLine() {
-  // 两种锁文件都清：npm 仓只有前者，pnpm 仓只有后者。留着旧锁 = 换线后直接 ERESOLVE，
-  // 而装失败之后 node_modules 停在旧版本上，后面每一步都绿（假绿）。
-  for (const lock of ['package-lock.json', 'pnpm-lock.yaml']) {
+  // 留着旧锁 = 换线后直接装不上，而装失败之后 node_modules 停在旧版本上，
+  // 后面每一步都绿（假绿）。
+  for (const lock of ['pnpm-lock.yaml']) {
     if (existsSync(lock)) {
       rmSync(lock);
-      console.log(`已删 ${lock}（它记着换线前的解析，留着会 ERESOLVE）。`);
+      console.log(`已删 ${lock}（它记着换线前的解析）。`);
     }
   }
   if (existsSync('node_modules')) {
@@ -505,17 +512,27 @@ function clearStaleLine() {
  * 跑一次安装。
  *
  * `--ignore-scripts` 的理由见文件头（本仓的 `prepare` 会 build）；`shell: true` 只为在 Windows 上
- * 找得到 `npm.cmd`，参数里没有 shell 元字符。
+ * 找得到 `pnpm.cmd`，参数里没有 shell 元字符。
+ *
+ * ⚠️ 刻意**不带** `--frozen-lockfile`：这一趟要的是「按新声明重新解析出来」的树，
+ * 不是按锁文件装的树。锁文件与清单不一致正是换版要造出来的中间态。
+ * `--config.node-linker=hoisted` 与 CI 一致，否则装出来的树与测试跑的那棵不是同一棵。
  *
  * @returns {boolean} 是否成功。
  */
 function install() {
-  const result = spawnSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund'], {
-    stdio: 'inherit',
-    shell: true,
-  });
+  const result = spawnSync(
+    'pnpm',
+    ['install', '--ignore-scripts', '--config.node-linker=hoisted'],
+    {
+      stdio: 'inherit',
+      shell: true,
+    },
+  );
   if (result.status !== 0) {
-    console.error('npm install 退出码 ' + String(result.status) + ' —— 树没换成，先解决安装问题。');
+    console.error(
+      'pnpm install 退出码 ' + String(result.status) + ' —— 树没换成，先解决安装问题。',
+    );
     return false;
   }
   return true;
@@ -572,14 +589,14 @@ async function swap(line, dropPrefix, onlyPrefix) {
     console.log(
       '\npackage.json 改了 ' +
         String(touched) +
-        ' 处。回滚：git checkout package.json package-lock.json',
+        ' 处。回滚：git checkout package.json pnpm-lock.yaml',
     );
   }
 
   clearStaleLine();
   if (!install()) return 1;
 
-  console.log('\nnpm install 成功 —— 但这不代表装到了目标版本，接着核对。');
+  console.log('\npnpm install 成功 —— 但这不代表装到了目标版本，接着核对。');
   return verify(line);
 }
 
@@ -678,7 +695,7 @@ async function verify(line) {
         line +
         ' 上 —— 换包那一步失败了，而旧版本的树会让测试全绿。',
     );
-    console.error('先看 npm install 的输出：多半是上游包之间的 peer 冲突，需要清掉旧树重装。');
+    console.error('先看 pnpm install 的输出：多半是上游包之间的 peer 冲突，需要清掉旧树重装。');
     return 1;
   }
   console.log(
