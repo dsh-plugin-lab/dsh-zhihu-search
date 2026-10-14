@@ -143,7 +143,7 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 
 卡片文案走 DSH 的 locale 服务，不硬编码：字典在 [src/client/locales.ts](../src/client/locales.ts)，槽位注册声明 `locale:` 之后框架才把类型化的 `t` 座位注入组件 props。代价是一个**硬依赖**——声明了 `locale:` 的条目在渲染时要求已安装的 locale 面，缺席即报错而不是降级。标准 `dsh web` 装配必然带它（DSH `packages/bundle/web-app` 依赖 `dsh-client-locale`，多个核心客户端包也依赖它）。
 
-**插件自己的名字与描述不走这条线**（2026-09-22 加）：宿主画插件页与设置时，插件**还没被加载**（禁用、加载失败、预设里的条目都要能显示），所以名字与描述由宿主按**包名**去读包根 [locale/](../locale/) 下的语言文件与 [package.json](../package.json) —— 不执行任何插件代码，也不需要浏览器半体在场。因此这里有**两条都能独立静默失败的线**：卡片能不能渲染是**半体接缝**问题（上文的两环，症状是配置区不出现，控制台有 WARN）；名字怎么显示是**清单资源**问题（`exports` 没暴露或 `files` 没收录，症状是退回技术名，**完全没有提示**）。后者由 [scripts/plugin-metadata.mjs](../scripts/plugin-metadata.mjs) 守卫，判定与 `npm run check:release` 同源。
+**插件自己的名字与描述不走这条线**（2026-09-22 加）：宿主画插件页与设置时，插件**还没被加载**（禁用、加载失败、预设里的条目都要能显示），所以名字与描述由宿主按**包名**去读包根 [locale/](../locale/) 下的语言文件与 [package.json](../package.json) —— 不执行任何插件代码，也不需要浏览器半体在场。因此这里有**两条都能独立静默失败的线**：卡片能不能渲染是**半体接缝**问题（上文的两环，症状是配置区不出现，控制台有 WARN）；名字怎么显示是**清单资源**问题（`exports` 没暴露或 `files` 没收录，症状是退回技术名，**完全没有提示**）。后者由 [scripts/plugin-metadata.mjs](../scripts/plugin-metadata.mjs) 守卫，判定与 `pnpm run check:release` 同源。
 
 ## 工具描述约定
 
@@ -223,7 +223,7 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 - **依赖的是运行时行为，不是 API 形状**：`schema.volatile()` 的活引用语义（`.get()`）、**只有 volatile 字段进配置页**、`settings.configure({ auto: false }, fiber)` 的页面策略、`ctx.on('loader/volatile-update', …)` 的就地对账、`role('secret')` 脱敏、**`ctx.inject` 的属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派（key = 包名，且**该槽不传 `form`**）、客户端服务 `ctx.configForms` 的 `get`/`getSnapshot`/`subscribe`/`mutate`、客户端模块格式。任一处改动都可能在升级后**静默失效**（卡片不显示、开关不生效、密钥读不到）。
 - **驱动版本用 dist-tag，不用版本号**：DSH 至今全是 prerelease。`latest` 在多数子包上指向过期版本（具体值现查 `npm view @deepseek-ai/dsh dist-tags`），**`next` 才是当前承诺线**（2026-09-24 起；在那之前是 `alpha`，而 `alpha` 现在不在我们的声明区间里）。三条线的语义与实测由 [compat.yml](../.github/workflows/compat.yml) 每周核对，处理链归 [docs/PUBLISHING.md](PUBLISHING.md) 的「兼容性」。
 - **声明面是 `engines.dsh` 加全部 `@deepseek-ai/dsh-*`，逐字相同**：只改一半时，使用者按依赖段装出来的宿主可能不满足 `engines.dsh`（或反过来），而**接缝缺席是静默的**。由 [test/redlines.test.ts](../test/redlines.test.ts) 的「声明面自洽」一组断言钉住。
-- **类型面会先于行为面动**：宿主收紧 API 签名时 `npm run typecheck` 先红，而全部测试仍然全绿。判断「兼容不兼容」不能只看测试结果。
+- **类型面会先于行为面动**：宿主收紧 API 签名时 `pnpm run typecheck` 先红，而全部测试仍然全绿。判断「兼容不兼容」不能只看测试结果。
 
 ### 契约纪律（破坏即改契约）
 
@@ -253,7 +253,7 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 - 位置：[test/contract-live-search.test.ts](../test/contract-live-search.test.ts)、[test/contract-live-global-search.test.ts](../test/contract-live-global-search.test.ts)，共用底座 [test/contract-helpers.ts](../test/contract-helpers.ts)。
 - **不 import `src/`**：只用 `fetch` 直连上游。复用插件的传输层会让插件的解析 bug 同时污染被测对象与断言，变成自我印证。
 - 底座另有一份**离线自检** [test/contract-helpers.test.ts](../test/contract-helpers.test.ts) 常驻日常 CI：指纹工具写错会让契约测试「假绿」，比没有契约测试更危险。
-- 触发：每周一 UTC 01:00 由 [contract.yml](../.github/workflows/contract.yml) 跑一次，另支持手动 `workflow_dispatch`；本地 `npm run test:contract`（需 `ZHIHU_ACCESS_SECRET`）。**不进日常 CI** —— 它花真实配额（约 16 次/轮），而契约漂移是「周」级信号，不是「每次提交」级。
+- 触发：每周一 UTC 01:00 由 [contract.yml](../.github/workflows/contract.yml) 跑一次，另支持手动 `workflow_dispatch`；本地 `pnpm run test:contract`（需 `ZHIHU_ACCESS_SECRET`）。**不进日常 CI** —— 它花真实配额（约 16 次/轮），而契约漂移是「周」级信号，不是「每次提交」级。
 - 密钥缺席时**红**，不静默跳过：跳过等于这套机制不存在。
 - **红了怎么办（顺序不可颠倒）**：① 重跑确认不是偶发 → ② 重跑探针确认上游到底变成了什么 → ③ 更新本文的「端点契约」「防错清单」「与知乎官方文档的偏差」 → ④ 最后才改实现与断言。反过来做，就会把「上游变了」记录成「测试过时了」。
 

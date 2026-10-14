@@ -1,6 +1,6 @@
 # test/ — 测试对应关系
 
-- 运行：`npm test`（vitest）；类型检查：`npm run typecheck`（覆盖 `src/` 与 `test/`）。
+- 运行：`pnpm test`（vitest）；类型检查：`pnpm run typecheck`（覆盖 `src/` 与 `test/`）。
 - 夹具在 [helpers.ts](helpers.ts)：走真实 `ZhihuClient`，只替换最外层 `fetch`；导出 `makeHarness` / `jsonResponse` / `sseResponse` / `execContext` / `envelope` 与 `Harness` / `FetchHandler` 类型。
 - 声明面读取器在 [declaration.ts](declaration.ts)：从 `package.json` 与 `cordis.patch.yml` 解析出包名与 insert 行。卡片 key 由这两半拼成，**测试不写死它** —— 写死的话 patch 的行 id 改了没人发现，症状是卡片静默消失。
 
@@ -29,9 +29,9 @@
 - [contract-helpers.ts](contract-helpers.ts)：契约测试的**共享底座**（直连客户端的 `callApi` + 指纹纯函数），刻意不 import `src/`。
 - [contract-helpers.test.ts](contract-helpers.test.ts)：该底座的**离线**自检（指纹工具写错会让契约测试假绿）。常驻日常 CI。
 - [contract-live-search.test.ts](contract-live-search.test.ts) / [contract-live-global-search.test.ts](contract-live-global-search.test.ts)：**契约测试**，直连真实知乎接口盯上游行为指纹。**不在日常 CI 里**，见下方「契约测试」一节。
-- [redlines.test.ts](redlines.test.ts)：五条红线的可执行守卫（依赖分层 / 呈现隔离 / 模型上下文隔离 / 无全局状态 / 模型不见原始语法），含 `package.json` 依赖检查与源码静态检查；另有一条**取服务路径**守卫 —— `src/index.ts` 的生效代码行里不得出现 `ctx.get('credentials')`（理由见 [复盘](../docs/postmortem/2026-09-15-credential-service-unreachable.md)）；还有一组 `文档不抄实测值` —— 活文档与 workflow 里不得留会漂的宿主版本字面量，门面双件只有在**同一行写出真源 [package.json](../package.json)** 时才允许留（记录层 `.agents/notes/`、`docs/postmortem/` 除外，它们写的是当时的事实）；以及一组 `锁文件` —— `package-lock.json` 的 `resolved` 必须指向官方源（此前这条只写在 [发布手册](../docs/PUBLISHING.md) 的前置条件里）；还有一组 `类型检查开关` —— 四个「通用 lint 那一档」的开关必须在 `tsconfig.json`（client / test 两个 project 都 extends 它，一处生效三处）；还有一组 `声明面自洽` —— **`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明必须逐字相同**（跨仓规则 7）。**2026-10-10 起判据从「下限不得低于」收紧成「逐字相同」**：上界也是声明的一半，而「下限不低于」连换版脚本漏掉 `engines.dsh` 都抓不到（那一行只要求不更低）。它同时要求每个分支（`||` 并集族）的下限**带预发布段**（写成裸版本号会让 next / alpha 两条线被混为一谈），并断言扫到的声明条数 > 10（匹配规则坏掉时先红，而不是静默变成一条永不触发的守卫）。**另有一条「同时承诺两族」**（`engines.dsh` 的 `||` 并集里含旧 RC 族与新 RC 族）—— 它读**已提交**的那份声明（`git show HEAD:package.json`），因为 compat 巡检的 `swap --only` 会临时收窄工作区清单去测低族（一次性测量、不提交），判工作区会把测量误报成「声明面缩窄」；无 git 时跳过。理由是[决策记录 1](../.agents/notes/2026-10-10-swap-must-move-engines-dsh.md)与[决策记录 2](../.agents/notes/2026-10-10-two-families-declared.md)。
+- [redlines.test.ts](redlines.test.ts)：五条红线的可执行守卫（依赖分层 / 呈现隔离 / 模型上下文隔离 / 无全局状态 / 模型不见原始语法），含 `package.json` 依赖检查与源码静态检查；另有一条**取服务路径**守卫 —— `src/index.ts` 的生效代码行里不得出现 `ctx.get('credentials')`（理由见 [复盘](../docs/postmortem/2026-09-15-credential-service-unreachable.md)）；还有一组 `文档不抄实测值` —— 活文档与 workflow 里不得留会漂的宿主版本字面量，门面双件只有在**同一行写出真源 [package.json](../package.json)** 时才允许留（记录层 `.agents/notes/`、`docs/postmortem/` 除外，它们写的是当时的事实）；以及一组 `锁文件` —— `pnpm-lock.yaml` 的 `resolved` 必须指向官方源（此前这条只写在 [发布手册](../docs/PUBLISHING.md) 的前置条件里）；还有一组 `类型检查开关` —— 四个「通用 lint 那一档」的开关必须在 `tsconfig.json`（client / test 两个 project 都 extends 它，一处生效三处）；还有一组 `声明面自洽` —— **`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明必须逐字相同**（跨仓规则 7）。**2026-10-10 起判据从「下限不得低于」收紧成「逐字相同」**：上界也是声明的一半，而「下限不低于」连换版脚本漏掉 `engines.dsh` 都抓不到（那一行只要求不更低）。它同时要求每个分支（`||` 并集族）的下限**带预发布段**（写成裸版本号会让 next / alpha 两条线被混为一谈），并断言扫到的声明条数 > 10（匹配规则坏掉时先红，而不是静默变成一条永不触发的守卫）。**另有一条「同时承诺两族」**（`engines.dsh` 的 `||` 并集里含旧 RC 族与新 RC 族）—— 它读**已提交**的那份声明（`git show HEAD:package.json`），因为 compat 巡检的 `swap --only` 会临时收窄工作区清单去测低族（一次性测量、不提交），判工作区会把测量误报成「声明面缩窄」；无 git 时跳过。理由是[决策记录 1](../.agents/notes/2026-10-10-swap-must-move-engines-dsh.md)与[决策记录 2](../.agents/notes/2026-10-10-two-families-declared.md)。
 
-产物级测试是**两个**（client-bundle 与 dist），它们读 `lib/`，故 `npm test` 先跑 build；其余测试一律从 `src/` 导入。
+产物级测试是**两个**（client-bundle 与 dist），它们读 `lib/`，故 `pnpm test` 先跑 build；其余测试一律从 `src/` 导入。
 `plugin-metadata.test.ts` 与 `release-workflow.test.ts` 是第三种：它们读的是**仓内声明文件**
 （`package.json`、`locale/`、`icon.svg`、`.github/workflows/release.yml`）与 `scripts/` 里的判定模块，
 既不 import `src/` 也不 import `lib/` —— 守的是「随包发出去的东西对不对」与「发布流程做没做对」，
@@ -41,8 +41,8 @@
 
 盯的是**上游行为**，不是我们的实现：知乎是黑盒，已经实测出来的结论（区间只筛候选、host 精确匹配、未记载的 `Filter` 可用……）会随上游悄悄漂移，所以把它们写成会红的断言。
 
-- 跑法：`npm run test:contract`（需 `ZHIHU_ACCESS_SECRET`）；CI 由 [.github/workflows/contract.yml](../.github/workflows/contract.yml) 每周一 UTC 01:00 + 手动触发。
-- **不进日常 CI**：花真实配额（每轮二十余次调用），且契约漂移是「周」级信号。日常 `npm test` 由 [vitest.config.ts](../vitest.config.ts) 排除 `test/contract-live-*.test.ts`；契约跑法由 [vitest.contract.config.ts](../vitest.contract.config.ts) 定义（串行 + 30s 超时）；底座的离线自检留在日常套件里。
+- 跑法：`pnpm run test:contract`（需 `ZHIHU_ACCESS_SECRET`）；CI 由 [.github/workflows/contract.yml](../.github/workflows/contract.yml) 每周一 UTC 01:00 + 手动触发。
+- **不进日常 CI**：花真实配额（每轮二十余次调用），且契约漂移是「周」级信号。日常 `pnpm test` 由 [vitest.config.ts](../vitest.config.ts) 排除 `test/contract-live-*.test.ts`；契约跑法由 [vitest.contract.config.ts](../vitest.contract.config.ts) 定义（串行 + 30s 超时）；底座的离线自检留在日常套件里。
 - **不 import `src/`**：只用 `fetch` 直连上游，避免插件的解析 bug 同时污染被测对象与断言。
 - 密钥缺席时**红**，不静默跳过。
 - **红了怎么办（顺序不可颠倒）**：① 重跑确认不是偶发 → ② 重跑探针确认上游变成了什么 → ③ 更新 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「端点契约 / 防错清单 / 与知乎官方文档的偏差」 → ④ 最后才改实现与断言。
@@ -57,7 +57,7 @@
   - [client-bundle.test.ts](client-bundle.test.ts)：按真实 Cordis 语义装配客户端入口，是唯一能看见 inject 门禁的地方；
   - [dist.test.ts](dist.test.ts)：编译后的 host 图能否在 Node 中求值（吃 `dsh-tools` 的导出面）。
   这三处红了 = **平台语义变了**，是最该警惕的一类。
-- **类型面**：`npm run typecheck` 覆盖 `src/` 与 `test/`。宿主收紧 API 签名时**它先红，而全部测试仍然全绿** —— 所以「测试全绿」不能当作「兼容」的结论。
+- **类型面**：`pnpm run typecheck` 覆盖 `src/` 与 `test/`。宿主收紧 API 签名时**它先红，而全部测试仍然全绿** —— 所以「测试全绿」不能当作「兼容」的结论。
 
 宿主的换包实测由 [compat.yml](../.github/workflows/compat.yml) 每周跑一次（`next` 承诺线 / `alpha` 记录线），跑的就是上面这些现有用例，不额外写测试；换包脚本本身由 [compat-swap.test.ts](compat-swap.test.ts) 守形状；机制与处理链见 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「兼容性」。
 

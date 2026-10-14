@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * 契约测试配置（`npm run test:contract`）：只跑打真实上游的那几个文件。
+ * 契约测试配置（`pnpm run test:contract`）：只跑打真实上游的那几个文件。
  *
  * - `fileParallelism: false`：两个文件同时打接口会把限流与配额观测混在一起，
  *   而契约测试要的正是「一次干净的观测」。

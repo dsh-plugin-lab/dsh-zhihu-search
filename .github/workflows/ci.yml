@@ -1,8 +1,8 @@
 # 日常 CI：每次推 main 与每个 PR 都跑类型检查与全量测试。
 #
-# 用 `npm ci` 而非 `npm install`：前者严格按 lockfile 安装，lockfile 与 package.json
-# 不同步时直接失败 —— 这正是我们要在 CI 里拦下的情况（本地曾用 --legacy-peer-deps 安装，
-# 导致 lockfile 缺自动 peer，CI 首次运行即红）。
+# 用 frozen 安装而非普通安装：前者严格按 lockfile 装，lockfile 与 package.json 不同步时直接失败
+# —— 这正是我们要在 CI 里拦下的情况（本地曾用 --legacy-peer-deps 安装，导致 lockfile 缺自动
+# peer，CI 首次运行即红）。`--config.node-linker=hoisted` 是正确性开关，不是性能选项（见文件尾）。
 name: CI
 
 on:
@@ -22,37 +22,33 @@ jobs:
       # 会被强制切到 24 跑并在每次 run 顶部挂一条告警。
       - uses: actions/checkout@v7
 
+      # pnpm 必须排在 setup-node 之前，否则 `cache: pnpm` 找不到 store。
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - uses: actions/setup-node@v7
         with:
           # 版本基线以 .node-version 为唯一来源，避免 CI 与本机漂移。
           node-version-file: .node-version
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile --config.node-linker=hoisted
 
-      # 版本号写在两处：package.json 决定发布号，package-lock.json 决定 npm ci 装的树。
-      # 手工改前者会漏掉后者，所以在每次推送就拦，不必等到发 tag。
-      - name: Verify the lockfile version matches package.json
-        run: |
-          pkg=$(node -p "require('./package.json').version")
-          lock=$(node -p "require('./package-lock.json').version")
-          if [ "$pkg" != "$lock" ]; then
-            echo "::error::package-lock.json version $lock does not match package.json version $pkg"
-            echo "bump with: npm version <patch|minor|major> --no-git-tag-version"
-            exit 1
-          fi
+      # 版本号只写在 package.json 一处：pnpm-lock v9 不记录根包自身的版本，没有 npm 仓那种
+      # 「lockfile 版本 == 清单版本」的交叉核对。「忘了 bump」由 release.yml 里「该版本已在 npm 上」
+      # 那道幂等判据兜住。
 
-      - run: npm run typecheck
+      - run: pnpm run typecheck
 
-      # `npm test` 自带 build：产物级测试（dist / client bundle）依赖 lib/ 已生成。
-      - run: npm test
+      # `pnpm test` 自带 build：产物级测试（dist / client bundle）依赖 lib/ 已生成。
+      - run: pnpm test
 
-      - run: npm run lint
+      - run: pnpm run lint
 
-      # 本次新增：lint 此前已在跑，但格式没进 CI —— 本仓有 .prettierrc.json，
-      # `npx prettier --check .` 此前只在本地手动跑。
+      # lint 此前已在跑，但格式没进 CI —— 本仓有 .prettierrc.json，此前只在本地手动跑。
       - name: Format check
-        run: npm run format:check
+        run: pnpm run format:check
   # 收口 job —— ruleset 的 required_status_checks 只配这一个名字（CI Success），
   # 本仓内部 job 增删时规则集无需改动。改本 job 前必读三条：
   #   1. 判定只放 step 级：放 job 级时条件为假会让本 job 变 skipped，
@@ -72,3 +68,6 @@ jobs:
           echo "::error::有 job 未成功 —— CI Success 判红（原因见本 job 上方注释）"
           echo '${{ toJSON(needs) }}'
           exit 1
+
+# 本文件跑在 hoisted linker 上。pnpm 默认的 symlink linker 解不开浏览器半边那几包的同侪关系，
+# 症状是**测试看不见自己的依赖**而不是一条像样的报错。理由见 [AGENTS.md](../../AGENTS.md)。

@@ -3,8 +3,10 @@
 # 设计取舍：
 #   - 只跑格式化与 lint（秒级）。typecheck / 测试 / check:release 留给 ci.yml ——
 #     钩子一慢，就会有人用 --no-verify 绕过，等于没有钩子。
-#   - 一律用 `npx --no-install`：只认仓内 node_modules 里已装的版本，
-#     **不联网下载**，版本与 CI（npm ci 装出来的那棵树）始终一致。
+#   - 一律用 `pnpm exec`：只借仓内 node_modules 里已装的版本，**不联网下载**，
+#     版本与 CI（frozen 安装装出来的那棵树）始终一致。
+#   - `--config.verify-deps-before-run=false` 是必需的：pnpm 默认在 exec 之前先校验依赖树，
+#     开着它每次跑钩子都会触发一次隐式安装。关掉后钩子只借工具，不装东西。
 #   - 自动修复（--write / --fix）会让文件在工作树里变化，**需要重新 git add**。
 #
 # 启用（每个 clone 执行一次；pre-commit 本体用 `uv tool install pre-commit` 装到 ~/.local/bin）：
@@ -20,16 +22,16 @@ repos:
   - repo: local
     hooks:
       - id: prettier
-        name: prettier --write (npx --no-install)
-        entry: npx --no-install prettier --write
+        name: prettier --write (pnpm exec)
+        entry: pnpm --config.verify-deps-before-run=false exec prettier --write
         language: system
         files: \.(ts|tsx|js|jsx|mjs|cjs|json|css|scss|html|yml|yaml)$
-        exclude: ^(node_modules/|lib/|package-lock\.json$)
+        exclude: ^(node_modules/|lib/|pnpm-lock\.yaml$)
         require_serial: true
 
       - id: eslint
-        name: eslint --fix (npx --no-install)
-        entry: npx --no-install eslint --fix
+        name: eslint --fix (pnpm exec)
+        entry: pnpm --config.verify-deps-before-run=false exec eslint --fix
         language: system
         files: \.(ts|tsx|js|jsx|mjs|cjs)$
         exclude: ^(node_modules/|lib/)

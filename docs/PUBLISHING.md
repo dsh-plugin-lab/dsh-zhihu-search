@@ -40,13 +40,13 @@ gh release list --limit 3                                     # 新号在列、�
 npm view dsh-zhihu-search dist-tags                           # alpha = 新号；latest 没动
 ```
 
-一次运行按顺序做完：校验触发分支是 `main` → **守卫**（[`scripts/release-guard.mjs`](../scripts/release-guard.mjs)：上个 tag 以来没有产物改动就直接红）→ `npm ci` / typecheck / test → 拦两处版本号漂移（`package.json` ↔ `package-lock.json`）→ **读出** `package.json` 的版本 → 按版本自己的预发布段推 dist-tag → 幂等判据（这个号已在 npm 上就跳过 publish）→ **验收闸**（`node scripts/acceptance.mjs .`：打真实接口并过宿主 `output.schema`，需仓库 secret `ZHIHU_ACCESS_SECRET`；**红了不发**）→ `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
+一次运行按顺序做完：校验触发分支是 `main` → **守卫**（[`scripts/release-guard.mjs`](../scripts/release-guard.mjs)：上个 tag 以来没有产物改动就直接红）→ `pnpm install --frozen-lockfile --config.node-linker=hoisted` / typecheck / test → 拦两处版本号漂移（`package.json` ↔ `pnpm-lock.yaml`）→ **读出** `package.json` 的版本 → 按版本自己的预发布段推 dist-tag → 幂等判据（这个号已在 npm 上就跳过 publish）→ **验收闸**（`node scripts/acceptance.mjs .`：打真实接口并过宿主 `output.schema`，需仓库 secret `ZHIHU_ACCESS_SECRET`；**红了不发**）→ `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
 
 六条设计约束：
 
 - **先发布、后动远端**：publish 失败时远端不发生任何变化，tag 与 Release 也只可能在发布成功后创建。
 - **幂等**：目标版本已在 npm 上时跳过 publish，只补齐 git 侧 —— 重跑一次即可修复「已发布但推送失败」的中断。
-- **发布不得改写版本号（版本驱动）**：`release.yml` 只发 `package.json` 里那个号，**没有 bump 步**。判据是**会执行的命令行**（[scripts/check-release.mjs](../scripts/check-release.mjs) 的 `findVersionWrites`，`npm run check:release` 与 [test/release-workflow.test.ts](../test/release-workflow.test.ts) 读同一份，带反向控制）。为什么写成硬规则：界面上的版本 tag 就是那个号，workflow 自己 bump 会让工作树永远停在「上一个已发布版本」，**截图必然拍出旧号**。
+- **发布不得改写版本号（版本驱动）**：`release.yml` 只发 `package.json` 里那个号，**没有 bump 步**。判据是**会执行的命令行**（[scripts/check-release.mjs](../scripts/check-release.mjs) 的 `findVersionWrites`，`pnpm run check:release` 与 [test/release-workflow.test.ts](../test/release-workflow.test.ts) 读同一份，带反向控制）。为什么写成硬规则：界面上的版本 tag 就是那个号，workflow 自己 bump 会让工作树永远停在「上一个已发布版本」，**截图必然拍出旧号**。
 - **dist-tag 由版本自己推导，不按输入参数判**：版本号带预发布段（`2.0.0-alpha.1`）就发到**那段本身**（`alpha`），否则走默认 `latest`；GitHub Release 的 `--prerelease` 与 publish 读同一个输出（`steps.version.outputs.dist_tag`）。判据只此一处，避免「推 latest 的那一档其实是预发布」—— `latest` 具体停在哪版一律现查 `npm view <包名> dist-tags`，本文不抄现值。
 - **tag 名 = `v` + `package.json` 里的版本号**（`v2.0.0-alpha.1`），与全部历史 tag 同形；**前缀是显式补的、
   不从值里推**。2026-09-22 踩过：版本号原来取自 `npm version` 的输出（**自带 `v`**），改成读 `package.json`
@@ -167,16 +167,16 @@ npm view dsh-zhihu-search dist-tags                           # alpha = 新号�
 六处需要解释，其余自明：
 
 - `icon.svg` 必须随包：插件在**插件页卡片 / 详情页 / 设置清单**里的图标由宿主读清单声明的那个相对路径（顶层 `"icon": "./icon.svg"`，路径相对声明它的清单且必须留在包目录内）。缺了它**不报错**，只是那一格退回面板默认图案 —— 与 `locale` 同一族静默故障，判定同在 [scripts/plugin-metadata.mjs](../scripts/plugin-metadata.mjs)（另含扩展名、≤ 256 KiB）。**注意它与 `assets/logo.svg` 不是同一个文件**：图标是派生出来的 36×36 独立资产，改一个不动另一个。
-- `locale/*.json` 必须随包，且被 `exports` 的 `./locale/*.json` 暴露：插件在**插件页与设置里的名字与描述**由宿主按包名读这两个文件（`meta.title` / `meta.description`），不走任何运行时通道。缺一条它**不报错**，只是退回技术名 —— 落地包与仓库里长得不一样，而本地开发（`link:` 挂载）永远看不出来。判定在 [scripts/plugin-metadata.mjs](../scripts/plugin-metadata.mjs)，`npm run check:release` 与 [test/plugin-metadata.test.ts](../test/plugin-metadata.test.ts) 读同一份。
+- `locale/*.json` 必须随包，且被 `exports` 的 `./locale/*.json` 暴露：插件在**插件页与设置里的名字与描述**由宿主按包名读这两个文件（`meta.title` / `meta.description`），不走任何运行时通道。缺一条它**不报错**，只是退回技术名 —— 落地包与仓库里长得不一样，而本地开发（`link:` 挂载）永远看不出来。判定在 [scripts/plugin-metadata.mjs](../scripts/plugin-metadata.mjs)，`pnpm run check:release` 与 [test/plugin-metadata.test.ts](../test/plugin-metadata.test.ts) 读同一份。
 - `lib/**/*.map` 被排除：这些 source map 指向未随包的 `src/`，对使用者是悬空的，却占了三分之一体积。tsconfig 仍生成它们，本地调试照常。
 - `README_en.md` 必须随包：`README.md` 顶部链接指向它，不随包就是 npm 页面上的死链。
-- `scripts/` 与 `src/` 不发布，因此 `npm run build` 必须在打包前跑过，`lib/` 是唯一交付物。
+- `scripts/` 与 `src/` 不发布，因此 `pnpm run build` 必须在打包前跑过，`lib/` 是唯一交付物。
 - `assets/` **不必**进包：npm 页面会把 README 里的相对图片路径改写到默认分支的 raw 地址（实测形态：`raw.githubusercontent.com/dsh-plugin-lab/dsh-zhihu-search/HEAD/<仓库相对路径>`，按仓库里的原始尺寸渲染）。代价是**所有已发布版本的页面都跟着 `main` 上的图走** —— 换图或删图等于同时改历史版本的展示。
 
 校验：
 
 ```bash
-npm run build
+pnpm run build
 npm pack --dry-run
 ```
 
@@ -199,12 +199,12 @@ npm view dsh-zhihu-search@<版本> dist.shasum   # 与上面那个 tarball 的 S
 | npm 上（workflow 在干净检出里打的包） | **42** | shasum `bdd4d510…` |
 
 差异只有一处：本机多一个 `lib/client.d.ts` —— **2026-09-13 遗留、不在 git 里**，
-而 workflow 是 `npm ci` 之后从干净检出构建的，天然没有它。删掉即逐字节一致。
+而 workflow 是 `pnpm install --frozen-lockfile --config.node-linker=hoisted` 之后从干净检出构建的，天然没有它。删掉即逐字节一致。
 **错的是本机，不是远端产物** —— 这类假红与「假绿」是同一个病的两面：比对的两个来源本来就不同源。
 
 - 同一批残留还有 `lib/client.d.ts.map` 与 `lib/client.js.map`（同为 9-13）：它们被 `files` 的
   `!lib/**/*.map` 挡在包外，**这次没影响，但同类残留还会再有** —— 别指望每次都被 `files` 挡住。
-- 更稳的做法是**在干净检出里 pack**（`git clone` 一份 / `git worktree add` 一个临时树 + `npm ci` + `npm run build`），
+- 更稳的做法是**在干净检出里 pack**（`git clone` 一份 / `git worktree add` 一个临时树 + `pnpm install --frozen-lockfile --config.node-linker=hoisted` + `pnpm run build`），
   本机那份只用来开发。两种做法都行，**但不能跳过这一步直接比**。
 
 ## 构建链的两个事实
@@ -238,7 +238,7 @@ npm view dsh-zhihu-search@<版本> dist.shasum   # 与上面那个 tarball 的 S
 ### 备选：本地发布
 
 ```bash
-npm run build
+pnpm run build
 npm pack --dry-run
 npm publish --registry=https://registry.npmjs.org/ --access public
 ```
@@ -251,9 +251,9 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 
 - `package.json` 的 `repository.url` 必须指向真实仓库，否则 npm 拒绝 provenance 或页面上没有源链接。
 - 所有 `@deepseek-ai/*` 保持在 `peerDependencies` 与 `devDependencies`，**不得**进 `dependencies` —— 见 [ARCHITECTURE.md](ARCHITECTURE.md) 的「不可破坏的约束」。
-- `package-lock.json` 的 `resolved` 必须指向 `registry.npmjs.org`。锁文件若由国内镜像生成，CI 会去镜像取包（供应链隐患），且 `npm ci` 可能因 peer 未同步而失败。**这条已落成红线**（[test/redlines.test.ts](../test/redlines.test.ts) 的「锁文件」组）—— 别再靠人核对。
-- **发布态不变量**（`dsh.bundle.patch` 在、`private` 未设、`engines.dsh` 已声明、`files` 含 `cordis.patch.yml`、LICENSE 在）已落成脚本 `npm run check:release`，[release.yml](../.github/workflows/release.yml) 发布前自动跑 —— 别再靠人核对这一节。
-- 依赖变更后用 `npm install --registry=https://registry.npmjs.org/` 重建锁文件：本地用 `--legacy-peer-deps` 安装会让 `package-lock.json` 缺自动 peer，`npm ci` 随即失败。
+- `pnpm-lock.yaml` 的 `resolved` 必须指向 `registry.npmjs.org`。锁文件若由国内镜像生成，CI 会去镜像取包（供应链隐患），且 `pnpm install --frozen-lockfile --config.node-linker=hoisted` 可能因 peer 未同步而失败。**这条已落成红线**（[test/redlines.test.ts](../test/redlines.test.ts) 的「锁文件」组）—— 别再靠人核对。
+- **发布态不变量**（`dsh.bundle.patch` 在、`private` 未设、`engines.dsh` 已声明、`files` 含 `cordis.patch.yml`、LICENSE 在）已落成脚本 `pnpm run check:release`，[release.yml](../.github/workflows/release.yml) 发布前自动跑 —— 别再靠人核对这一节。
+- 依赖变更后用 `npm install --registry=https://registry.npmjs.org/` 重建锁文件：本地用 `--legacy-peer-deps` 安装会让 `pnpm-lock.yaml` 缺自动 peer，`pnpm install --frozen-lockfile --config.node-linker=hoisted` 随即失败。
 
 ## CI
 
@@ -263,13 +263,13 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 - [compat.yml](../.github/workflows/compat.yml)：每周一 02:00 UTC 盯**宿主 DSH** 的版本线，见[兼容性](#兼容性)。
   与 contract.yml 同构、分工不同：两条上游各自会悄悄漂移，时间错开是为了红了能分清是谁漂了。
 
-两者都用 `npm ci`：它严格按锁文件安装，锁文件与 `package.json` 不同步时直接失败 —— 这是我们要在 CI 里拦下的情况。
+两者都用 `pnpm install --frozen-lockfile --config.node-linker=hoisted`：它严格按锁文件安装，锁文件与 `package.json` 不同步时直接失败 —— 这是我们要在 CI 里拦下的情况。
 
-两者都校验 `package.json` 与 `package-lock.json` 的**版本号**一致：ci.yml 在每次推送就拦，release.yml 在 bump 之前再拦一次。版本号写两处，漏一处不该等到发版才发现。
+两者都校验 `package.json` 与 `pnpm-lock.yaml` 的**版本号**一致：ci.yml 在每次推送就拦，release.yml 在 bump 之前再拦一次。版本号写两处，漏一处不该等到发版才发现。
 
 发版提交由 `dsh-shipwright` App token 推送，提交信息带 `[skip ci]`，因此不会再触发一轮 ci.yml；发布工作流自身已跑过 typecheck 与 test。
 
-- 两份 workflow 的 action 均已升 v7：v7 移除了 dummy `NODE_AUTH_TOKEN` 兜底（`.npmrc` 引用 `${NODE_AUTH_TOKEN}`，而 `npm ci` 跑在带真 token 的 `npm publish` 之前）—— 2026-09-13 在 PR 分支用 `workflow_dispatch` 实跑验证过，无需为它退回 v4。
+- 两份 workflow 的 action 均已升 v7：v7 移除了 dummy `NODE_AUTH_TOKEN` 兜底（`.npmrc` 引用 `${NODE_AUTH_TOKEN}`，而 `pnpm install --frozen-lockfile --config.node-linker=hoisted` 跑在带真 token 的 `npm publish` 之前）—— 2026-09-13 在 PR 分支用 `workflow_dispatch` 实跑验证过，无需为它退回 v4。
 - action 版本漂移交给 [dependabot.yml](../.github/dependabot.yml)（每周一个 bump PR）。**PR 上的 CI 只跑 ci.yml：动 `release.yml` 的 PR 就算绿勾也不代表发布链路验过** —— 改发布链必须手动 dispatch 实跑。
 
 ## 兼容性
@@ -323,7 +323,7 @@ DSH 至今全是 prerelease，版本号本身不构成承诺，tag 才是。三�
 - `engines.dsh` 的区间 → 两份 README 的「版本兼容」章节（那份章节只指真源，不抄版本）：它声明的是**实际验证过的最低宿主版本**与**排除下一个大版本的上界**。
 - **`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明必须逐字相同**（2026-10-10 起：同一条区间字符串，连上界与运算符一起比）→ 由 [test/redlines.test.ts](../test/redlines.test.ts) 的「声明面自洽」一组断言；改一处就要改全部，否则使用者按我们给的区间装出来的宿主可能没有本插件赖以工作的接缝。判据收紧过一次：从「下限不得低于」到「逐字相同」，理由见[决策记录](../.agents/notes/2026-10-10-swap-must-move-engines-dsh.md)。
 - [scripts/compat-swap.mjs](../scripts/compat-swap.mjs) 的换包写回是**保形**的：只替换区间里的下限版本，运算符与上界原样留下；它同时**一并改写 `engines.dsh`**、**清掉换线前的锁与树**、并自带 `verify` 核对实装版本。别改成 `'^' + version` 那种硬编码 —— 它会把声明面在 CI 里悄悄变形，而人只看到 job 绿。形状自检跑 `node scripts/compat-swap.mjs selftest`（[test/compat-swap.test.ts](../test/compat-swap.test.ts) 跑同一条）。
-- 声明面与「README 让用户去装的那条线」由 [compat.yml](../.github/workflows/compat.yml) 的 `declaration` 作业对账，判定实现**只有一处**：[scripts/check-declaration.mjs](../scripts/check-declaration.mjs)（`npm run check:declaration`，或 `--line <tag>` 换一条线判）。它红了就是声明面落后，失败会开一条固定标题的跟踪 issue。**它只查承诺线（next）** —— 查一条我们不再声明的线，红只会变成每周的噪音。
+- 声明面与「README 让用户去装的那条线」由 [compat.yml](../.github/workflows/compat.yml) 的 `declaration` 作业对账，判定实现**只有一处**：[scripts/check-declaration.mjs](../scripts/check-declaration.mjs)（`pnpm run check:declaration`，或 `--line <tag>` 换一条线判）。它红了就是声明面落后，失败会开一条固定标题的跟踪 issue。**它只查承诺线（next）** —— 查一条我们不再声明的线，红只会变成每周的噪音。
 - **区间放宽**本身不改行为（旧用法仍正确，只是允许更新的宿主）→ 按[版本号](#版本号)的 Q1/Q2 全否 → **patch**；但**必须发版**，声明在产物里。
 - **下限抬到某条线**是另一种情形：旧宿主上的用法仍然正确，但那条线上的使用者必须升级宿主才能用新版本 —— 这是 Q2 **是**，按问题链的默认落点是 major，实践上一般走 **minor**（不改任何配置或数据，只缩窄承诺面）。2026-10-10 那次即按 minor 发，理由与替代方案见[决策记录](../.agents/notes/2026-10-10-declaration-floor-to-rc-line.md)。
 - 已知缺口与待办见 [AGENTS.md](../AGENTS.md)。

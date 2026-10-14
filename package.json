@@ -64,7 +64,7 @@
   "scripts": {
     "build": "tsc && tsc -p tsconfig.client.json && node scripts/build-client.mjs",
     "typecheck": "tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.client.json --noEmit",
-    "test": "npm run build && vitest run",
+    "test": "pnpm run build && vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run --config vitest.contract.config.ts",
     "lint": "eslint .",
@@ -72,7 +72,7 @@
     "format:check": "prettier --check .",
     "check:release": "node scripts/check-release.mjs",
     "check:declaration": "node scripts/check-declaration.mjs",
-    "prepare": "npm run build"
+    "prepare": "pnpm run build"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",

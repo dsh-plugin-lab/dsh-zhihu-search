@@ -1,5 +1,5 @@
 node_modules/
 lib/
-package-lock.json
+pnpm-lock.yaml
 *.md
 .pre-commit-config.yaml
