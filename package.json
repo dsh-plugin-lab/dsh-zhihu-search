@@ -1,6 +1,6 @@
 {
   "name": "dsh-zhihu-search",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Zhihu in-site search, global web search, and Zhida answers for the model, over the official Zhihu Open Platform API.",
   "keywords": [
     "dsh",

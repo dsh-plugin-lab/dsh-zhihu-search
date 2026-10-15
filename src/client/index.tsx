@@ -264,6 +264,26 @@ const S = {
     lineHeight: 1.5,
     color: 'var(--dsw-alias-state-error-primary)',
   },
+  // 保存按钮：逐条对齐官方 SettingsForm 的 `.save`（SettingsForm.module.css:32-53）——
+  // 官方设置页不用 Button 组件（md 档 36px 高），是这一款紧凑定制按钮。
+  // 注意错误色那条例外对这里同样成立：focus ring 令牌取 ui-theme 里真实存在的别名。
+  save: {
+    appearance: 'none',
+    border: '1px solid transparent',
+    borderRadius: 'var(--dsw-radius-md)',
+    padding: '5px 14px',
+    font: 'inherit',
+    fontSize: 13,
+    lineHeight: 1.5,
+    cursor: 'pointer',
+    background: 'var(--dsw-alias-label-primary)',
+    color: 'var(--dsw-alias-bg-layer-3)',
+  },
+  // 官方 `.save:disabled` 的 opacity 0.4 与默认光标，等价改写成对象形式。
+  saveDisabled: {
+    opacity: 0.4,
+    cursor: 'default',
+  },
 } satisfies Record<string, CSSProperties>;
 
 /**
@@ -550,16 +570,16 @@ function ZhihuCard({ form, store, trackSavedRef, t }: CardProps): JSX.Element {
             {failed}
           </p>
         ) : null}
-        <Button
+        <button
           type="button"
-          variant="primary"
+          style={blocked ? { ...S.save, ...S.saveDisabled } : S.save}
           disabled={blocked}
           onClick={() => {
             void save();
           }}
         >
           {saving ? t('saving') : t('save')}
-        </Button>
+        </button>
       </div>
     </div>
   );
