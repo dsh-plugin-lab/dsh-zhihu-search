@@ -12,6 +12,7 @@
     "tool"
   ],
   "license": "MIT",
+  "author": "zlZayn",
   "icon": "./icon.svg",
   "repository": {
     "type": "git",
