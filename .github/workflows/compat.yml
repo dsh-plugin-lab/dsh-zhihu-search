@@ -290,7 +290,7 @@ jobs:
       - name: Swap onto the next line, install, and confirm what got installed
         id: verify
         continue-on-error: true
-        run: node scripts/compat-swap.mjs swap next --only 0.2.0
+        run: node scripts/compat-swap.mjs swap next --only 0.2.1
 
       - name: Typecheck
         id: typecheck

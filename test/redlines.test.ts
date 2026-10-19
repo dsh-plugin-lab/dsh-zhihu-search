@@ -131,9 +131,14 @@ describe('声明面自洽：全部 dsh 声明与 engines.dsh 逐字相同，且�
     expect(offenders, `这些声明与 engines.dsh（${engine}）不同形状或不同区间`).toEqual([]);
   });
 
-  it('engines.dsh 同时承诺 0.1.7 与 0.2.0 两族（|| 并集），删掉一族等于缩窄对外承诺', () => {
+  it('engines.dsh 同时承诺 0.1.7 与 0.2.1 两族（|| 并集），删掉一族等于缩窄对外承诺', () => {
     // 为什么钉这一条：0.1.7 那族是**真实兼容修复**（有使用者停在 0.1.7，2.1.0 抬下限把他们判不兼容，
     // 本次加回）。删掉它会让那批使用者再次装不上，而且没有任何别的地方会红。
+    //
+    // 第二族的**元组**是会漂的：npm 的预发布语义要求候选与区间里**同一 major.minor.patch** 且带预发布段的
+    // 比较子对上，所以宿主每往前推一个补丁位的预发布，这一族就得手工跟着抬（2026-10-17 宿主发 0.2.1-rc.x，
+    // 0.2.0 族当场罩不住 —— 不是形状选错，是「跟预发布线」的固有代价）。本条钉住的是「不只一族 + 稳住 0.1.7」，
+    // 第二族的元组由上面那条「逐字相同」与 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的换线流程一起守。
     //
     // 读**已提交**的那份声明（`git show HEAD:package.json`），且**只在读得到时判**：compat 巡检的
     // `swap --only` 会把工作区清单**临时收窄成单族**去测低族，那是一次性测量、不提交。若读工作区
@@ -149,7 +154,13 @@ describe('声明面自洽：全部 dsh 声明与 engines.dsh 逐字相同，且�
       .filter((tuple): tuple is string => tuple !== undefined);
     expect(families, 'engines.dsh 读不出任何族').toHaveLength(2);
     expect(families).toContain('0.1.7');
-    expect(families).toContain('0.2.0');
+    // 第二族的**元组**不写死：宿主每往前推一个补丁位的预发布，就得手工把它抬一次
+    // （npm 只匹配同一 major.minor.patch 且带预发布段的比较子）。写死元组会让每轮换线都要改测试，
+    // 而这条红线要守的是「别把第二族悄悄删掉」。
+    expect(
+      families.filter((tuple) => tuple !== '0.1.7'),
+      'engines.dsh 的第二族不见了（只剩 0.1.7）',
+    ).toHaveLength(1);
   });
 });
 
