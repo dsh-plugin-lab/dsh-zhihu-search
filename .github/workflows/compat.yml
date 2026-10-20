@@ -154,7 +154,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # pnpm 必须排在 setup-node 之前，否则 `cache: pnpm` 找不到 store。
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11
 
@@ -261,7 +261,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # pnpm 必须排在 setup-node 之前，否则 `cache: pnpm` 找不到 store。
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11
 
