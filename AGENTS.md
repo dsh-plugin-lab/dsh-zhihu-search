@@ -149,3 +149,4 @@
 - 构建与校验脚本 → [scripts/README.md](scripts/README.md)
 - 图片资源与重截流程 → [assets/README.md](assets/README.md)（`banner.svg` 头图双语共用，其余资产的引用面见该文件）+ [assets/AGENTS.md](assets/AGENTS.md)（改渲染面必重截，先问再占用浏览器）
 - 跨仓规范 → [plugin-conventions](https://github.com/dsh-plugin-lab/.github/blob/main/docs/plugin-conventions.md)
+  （插件仓共同遵守的公约；判这条算不算缺陷见 [criteria](https://github.com/dsh-plugin-lab/.github/blob/main/docs/criteria.md)）
