@@ -96,7 +96,19 @@ describe('红线 1：@deepseek-ai/* 绝不进入 dependencies', () => {
   });
 });
 
-describe('声明面自洽：全部 dsh 声明与 engines.dsh 逐字相同，且承诺的族不只一族', () => {
+/**
+ * 声明面对外承诺的宿主族 —— **唯一一处**。
+ *
+ * 每一个字符串就是一个 `||` 分支的完整区间，顺序即声明顺序。增删一族必须改这里，
+ * 而那正是要的效果：它逼人回来看一眼「这是不是有意的」。
+ *
+ * 2026-11-13 从四族收成一族：宿主的 0.2.2 rc 线删掉了本仓依赖的符号（姊妹仓同日各撞一个：
+ * `useAnchoredPosition` 值导出、`AgentRegistry.roots()`），旧的三条族承诺随之跑不起来 ——
+ * 承诺了却跑不了，比缩窄更不诚实。
+ */
+const PROMISED_FAMILIES = ['^0.2.2-rc.3'] as const;
+
+describe('声明面自洽：全部 dsh 声明与 engines.dsh 逐字相同，且承诺的族与 PROMISED_FAMILIES 一致', () => {
   // 这条是**跨仓规则 7**（见根目录 AGENTS.md 的逐条裁定）。此前它写的是「下限不得低于」，
   // 2026-10-10 收紧成**逐字相同** —— 理由有两条，各自都实测过：
   //   1. **上界也是声明的一半**。本仓的形态是 `>=下限 <下一族`，一条写成 `^0.2.0-rc.1`、
@@ -133,14 +145,15 @@ describe('声明面自洽：全部 dsh 声明与 engines.dsh 逐字相同，且�
     expect(offenders, `这些声明与 engines.dsh（${engine}）不同形状或不同区间`).toEqual([]);
   });
 
-  it('engines.dsh 承诺 0.1.7 与全部 RC 族（|| 并集），删掉一族等于缩窄对外承诺', () => {
-    // 为什么钉这一条：0.1.7 那族是**真实兼容修复**（有使用者停在 0.1.7，2.1.0 抬下限把他们判不兼容，
-    // 本次加回）。删掉它会让那批使用者再次装不上，而且没有任何别的地方会红。
+  it('engines.dsh 的族与 PROMISED_FAMILIES 一致，增删一族等于改对外承诺', () => {
+    // 为什么钉这一条：删掉一族会让那批使用者装不上，而且没有任何别的地方会红。
     //
-    // 第二族的**元组**是会漂的：npm 的预发布语义要求候选与区间里**同一 major.minor.patch** 且带预发布段的
-    // 比较子对上，所以宿主每往前推一个补丁位的预发布，这一族就得手工跟着抬（2026-10-17 宿主发 0.2.1-rc.x，
-    // 0.2.0 族当场罩不住 —— 不是形状选错，是「跟预发布线」的固有代价）。本条钉住的是「不只一族 + 稳住 0.1.7」，
-    // 第二族的元组由上面那条「逐字相同」与 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的换线流程一起守。
+    // **族清单写在 PROMISED_FAMILIES 一处**，本处只比它。原先这里写的是「读不出四族 / 不少于三族」
+    // 那种字面量，收窄时只能改断言 —— 而一条会因为「改了实现」而必须改的判据，判不出「这是不是有意变更」。
+    //
+    // 族的**元组**会漂：npm 的预发布语义要求候选与区间里**同一 major.minor.patch** 且带预发布段的
+    // 比较子对上，所以宿主每往前推一个补丁位的预发布，这一族就得手工跟着抬（2026-10-17 宿主发
+    // 0.2.1-rc.x，0.2.0 族当场罩不住 —— 不是形状选错，是「跟预发布线」的固有代价）。
     //
     // 读**已提交**的那份声明（`git show HEAD:package.json`），且**只在读得到时判**：compat 巡检的
     // `swap --only` 会把工作区清单**临时收窄成单族**去测低族，那是一次性测量、不提交。若读工作区
@@ -152,17 +165,11 @@ describe('声明面自洽：全部 dsh 声明与 engines.dsh 逐字相同，且�
     const engine = committed.engines?.['dsh'] ?? '';
     const families = engine
       .split('||')
-      .map((branch) => /(\d+)\.(\d+)\.(\d+)/.exec(branch)?.[0])
-      .filter((tuple): tuple is string => tuple !== undefined);
-    expect(families, 'engines.dsh 读不出四族').toHaveLength(4);
-    expect(families).toContain('0.1.7');
-    // 第二、三族的**元组**不写死：宿主每往前推一个补丁位的预发布，就得手工把它抬一次
-    // （npm 只匹配同一 major.minor.patch 且带预发布段的比较子）。写死元组会让每轮换线都要改测试，
-    // 而这条红线要守的是「别把承诺的族悄悄删掉」。
-    expect(
-      families.filter((tuple) => tuple !== '0.1.7'),
-      'engines.dsh 承诺的 RC 族不足三族（三个 RC 族都得在）',
-    ).toHaveLength(3);
+      .map((branch) => branch.trim())
+      .filter((branch) => branch !== '');
+    expect(families, `engines.dsh 的族与 PROMISED_FAMILIES 不一致：${engine}`).toEqual([
+      ...PROMISED_FAMILIES,
+    ]);
   });
 });
 
