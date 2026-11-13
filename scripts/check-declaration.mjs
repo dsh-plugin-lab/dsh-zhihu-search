@@ -45,21 +45,16 @@ export const TRACKED_LINE = 'next';
 /**
  * 巡检要判的**全部目标线**：声明面承诺了哪几族，这里就得判哪几族。
  *
- * 为什么不是只判一条：声明面是**四族并集**（0.1.7-rc / 0.2.0-rc / 0.2.1-rc / 0.2.2-rc），
- * 只判其中一条等于「声明了却没验」—— 另外两族烂掉也没有任何判据会红，
+ * 为什么不是只判一条：只判其中一条等于「声明了却没验」—— 别的族烂掉也没有任何判据会红，
  * 那正是姊妹仓 2026-10-19 修掉的「假绿」同类问题。
  *
- * 前一条是 dist-tag（`next` 指向当前承诺线）；后两条用**版本前缀**定位族 ——
- * 实测没有任何 dist-tag 指向 0.1.7-rc / 0.2.0-rc（现查 `npm view <包> dist-tags`）。
+ * **2026-11-13 收成单族**：宿主 0.2.2 rc 线删了本仓依赖的符号，声明面随之从四族并集收窄到
+ * 只承诺 `next` 指向的那一族。这里跟着收窄 —— 改族要同批改三处：`package.json` 的
+ * `engines.dsh`、本文件的 `TRACKED_LINES`、`.github/workflows/compat.yml` 的矩阵。
  *
  * @type {{ line: string, kind: 'tag' | 'prefix' }[]}
  */
-export const TRACKED_LINES = [
-  { line: 'next', kind: 'tag' },
-  { line: '0.2.1-rc', kind: 'prefix' },
-  { line: '0.2.0-rc', kind: 'prefix' },
-  { line: '0.1.7-rc', kind: 'prefix' },
-];
+export const TRACKED_LINES = [{ line: 'next', kind: 'tag' }];
 
 /** 声明面里的宿主本体：`engines.dsh` 描述的就是它。 */
 const HOST_PACKAGE = '@deepseek-ai/dsh';
