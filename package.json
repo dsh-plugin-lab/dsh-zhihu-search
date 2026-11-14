@@ -9,7 +9,9 @@
     "zhihu",
     "zhihu-api",
     "search",
-    "tool"
+    "tool",
+    "zhida",
+    "web-search"
   ],
   "license": "MIT",
   "author": "zlZayn",
