@@ -32,6 +32,13 @@
 - **插件展示元数据（宿主界面上的名字、描述与图标）只住在包根**：[locale/](locale/) 的 `meta.title` / `meta.description` 是文案的唯一来源，[icon.svg](icon.svg) 是图标的唯一来源（由 `package.json` 顶层 `icon` 声明）。别处只留指针、不复制 —— 抄一份就有两处会漂，而宿主**读不到时不报错**（名字退回技术名；图标位空着就退回面板默认图案）。两者都由 [scripts/plugin-metadata.mjs](scripts/plugin-metadata.mjs) 判定随包与可解析（`pnpm run check:release` 与 [test/plugin-metadata.test.ts](test/plugin-metadata.test.ts) 读同一份），理由与回落链见[决策记录](.agents/notes/2026-09-22-plugin-display-metadata.md)，图标几何与配色判据见[图标记录](.agents/notes/2026-09-22-plugin-icon.md)
 - **四个「通用 lint 那一档」的编译器开关仍在**（`noUnusedLocals` / `noUnusedParameters` / `noImplicitReturns` / `noFallthroughCasesInSwitch`），缺任何一个覆盖面就不成立 → 由 [test/redlines.test.ts](test/redlines.test.ts) 断言；client / test 两个 project 都 extends 根 `tsconfig.json`，一处生效三处。**它们与 ESLint 的分工**（开关管类型与死代码、ESLint 管编译器覆盖不到的那一档）见 [决策记录](.agents/notes/2026-09-27-adopt-eslint-prettier.md)
 - **发布态不变量由脚本守卫**（`dsh.bundle.patch` 在、`private` 没设、`engines.dsh` 声明了、`files` 带 `cordis.patch.yml`、LICENSE 在）→ `pnpm run check:release`，[release.yml](.github/workflows/release.yml) 发布前跑。**端到端验收**（真实接口 + 宿主 `output.schema` 校验，补的正是 v1.4.0 那类漏）同样在 [release.yml](.github/workflows/release.yml)、**publish 前**跑一次：`node scripts/acceptance.mjs .`，**红了不发**，需要仓库 secret `ZHIHU_ACCESS_SECRET` → [scripts/acceptance.mjs](scripts/acceptance.mjs)
+- **本仓的发布流程是一份自带副本，有意不调用组织仓的共享发布流** —— 这是全族唯一被点名的例外。
+  理由：本仓在构建与发布之间有自己的步骤（真实接口验收 `scripts/acceptance.mjs`、OIDC claims 转储、
+  用 App token 把发布提交推回 main），而这些步骤的位置和条件都是本仓的，塞不进一份共享文件的 inputs。
+  组织仓的 `docs/plugin-conventions.md` §3 把这条写成规则本身的一部分：「必须在构建与发布之间插一步的仓
+  保留整份副本，并在本仓 `AGENTS.md` 说明」。**这不算漂移，也不该被"统一"掉** —— 其余五个仓调用共享流，
+  行为断言由组织仓的 `scripts/lib/release-flow.mjs` 对着那份共享文件核；本仓的那份由本仓
+  [test/redlines.test.ts](test/redlines.test.ts) 自己核。
 - 决策理由 → [.agents/notes/](.agents/notes/)
 - 发版授权：patch / minor 按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定档后**直接发**；**major 必须先问人类**；**零行为变更不发版**（纯文档 / 测试 / CI / 等价重构）
 
